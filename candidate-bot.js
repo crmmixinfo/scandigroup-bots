@@ -153,9 +153,12 @@ bot.on('text', async (ctx) => {
     return ctx.reply(T[lang].askBirth);
   }
 
-  if (step === 'birth') {
-    if (!/^\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{4}$/.test(text)) {
-      return ctx.reply(T[lang].invalid);
+if (step === 'birth') {
+    ctx.session.data.birth = text;
+    ctx.session.step = 'district';
+    const buttons = DISTRICTS[lang].map(d => [Markup.button.callback(d, `dist_${d}`)]);
+    return ctx.reply(T[lang].askDistrict, Markup.inlineKeyboard(buttons));
+  }
     }
     ctx.session.data.birth = text;
     ctx.session.step = 'district';
