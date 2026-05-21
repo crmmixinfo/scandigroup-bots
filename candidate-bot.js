@@ -11,40 +11,46 @@ const T = {
     welcome: '👋 Привет! Мы ищем сотрудников.\n\nКороткая анкета на 1 минуту — нажмите «Начать».',
     start: '🚀 Начать',
     chooseVacancy: '🎯 Какая вакансия вас интересует?',
-    noVacancies: 'Активных вакансий пока нет. Попробуйте позже.',
+    noVacancies: 'Активных вакансий пока нет.',
     askName: '✍️ Введите вашу фамилию и имя:',
-    askBirth: '🎂 Дата рождения:\n(Например: 15.03.1998)',
-    askDistrict: '📍 Выберите ваш район проживания:',
+    askBirth: '🎂 Выберите год рождения:',
+    askBirthMonth: '🎂 Выберите месяц:',
+    askBirthDay: '🎂 Выберите день:',
+    askDistrict: '📍 Выберите ваш район:',
     askContact: '📱 Поделитесь номером телефона:',
     shareContact: '📲 Поделиться контактом',
-    orManual: '✏️ Или напишите вручную:\n+998901234567 @username',
-    askPhoto: '📸 Загрузите вашу фотографию:\n(Чёткое фото лица, обязательно)',
-    askVoice: '🎤 Запишите голосовое о себе (до 60 сек):\nРасскажите о себе и почему хотите работать с нами',
+    orManual: '✏️ Или напишите вручную: +998901234567',
+    askPhoto: '📸 Загрузите вашу фотографию:',
+    askVoice: '🎤 Запишите голосовое о себе (до 60 сек):',
     done: '✅ Спасибо! Ваша анкета принята.\n\n📋 Скоро с вами свяжутся!\n\n🍀 Удачи!',
     invalid: '❌ Неверный формат. Попробуйте ещё раз.',
-    photoOnly: '📸 Пожалуйста, отправьте фотографию.',
-    voiceOnly: '🎤 Пожалуйста, отправьте голосовое сообщение.',
-    shareLink: '👇 Поделитесь ботом с друзьями:',
+    photoOnly: '📸 Отправьте фотографию.',
+    voiceOnly: '🎤 Отправьте голосовое сообщение.',
+    shareLink: '👇 Поделитесь ботом:',
+    months: ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'],
   },
   uz: {
     chooseLang: '🌐 Выберите язык / Tilni tanlang:',
     welcome: "👋 Salom! Xodim izlayapmiz.\n\n1 daqiqalik qisqa ariza — «Boshlash» tugmasini bosing.",
     start: '🚀 Boshlash',
     chooseVacancy: '🎯 Qaysi lavozim sizni qiziqtiradi?',
-    noVacancies: "Hozircha aktiv vakansiya yo'q. Keyinroq urinib ko'ring.",
+    noVacancies: "Hozircha aktiv vakansiya yo'q.",
     askName: '✍️ Familiya va ismingizni kiriting:',
-    askBirth: "🎂 Tug'ilgan sanangiz:\n(Masalan: 15.03.1998)",
+    askBirth: '🎂 Tug\'ilgan yilni tanlang:',
+    askBirthMonth: '🎂 Oyni tanlang:',
+    askBirthDay: '🎂 Kunni tanlang:',
     askDistrict: '📍 Yashash tumaningizni tanlang:',
     askContact: '📱 Telefon raqamingizni ulashing:',
     shareContact: '📲 Kontaktni ulashish',
-    orManual: "✏️ Yoki qo'lda yozing:\n+998901234567 @username",
-    askPhoto: "📸 Rasmingizni yuklang:\n(Aniq yuz rasmi, majburiy)",
-    askVoice: "🎤 O'zingiz haqida ovozli xabar yozing (60 soniyagacha):\nO'zingiz va nega biz bilan ishlashni xohlayotganingiz haqida",
+    orManual: "✏️ Yoki qo'lda yozing: +998901234567",
+    askPhoto: '📸 Rasmingizni yuklang:',
+    askVoice: "🎤 O'zingiz haqida ovozli xabar yozing (60 sek):",
     done: "✅ Rahmat! Arizangiz qabul qilindi.\n\n📋 Tez orada bog'lanamiz!\n\n🍀 Omad!",
-    invalid: "❌ Noto'g'ri format. Qayta urinib ko'ring.",
-    photoOnly: '📸 Iltimos, rasm yuboring.',
-    voiceOnly: '🎤 Iltimos, ovozli xabar yuboring.',
-    shareLink: "👇 Botni do'stlaringizga ulashing:",
+    invalid: "❌ Noto'g'ri format.",
+    photoOnly: '📸 Rasm yuboring.',
+    voiceOnly: '🎤 Ovozli xabar yuboring.',
+    shareLink: "👇 Botni ulashing:",
+    months: ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'],
   }
 };
 
@@ -53,41 +59,63 @@ const DISTRICTS = {
   ru: ["Бектемирский","Чиланзарский","Яшнободский","Мирободский","Мирзо Улугбека","Сергелийский","Алмазарский","Шайхантахурский","Учтепинский","Яккасарайский","Юнусабадский","Янгихаётский"]
 };
 
+// Yil tugmalari (1970-2006)
+function yearButtons() {
+  const years = [];
+  const row = [];
+  for (let y = 2006; y >= 1970; y--) {
+    row.push(Markup.button.callback(String(y), `year_${y}`));
+    if (row.length === 4) { years.push([...row]); row.length = 0; }
+  }
+  if (row.length) years.push([...row]);
+  return years;
+}
+
+// Oy tugmalari
+function monthButtons(lang, year) {
+  const months = T[lang].months;
+  const rows = [];
+  for (let i = 0; i < 12; i += 4) {
+    rows.push(months.slice(i, i+4).map((m, j) =>
+      Markup.button.callback(m, `month_${year}_${i+j+1}`)
+    ));
+  }
+  return rows;
+}
+
+// Kun tugmalari
+function dayButtons(year, month) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const rows = [];
+  const row = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    row.push(Markup.button.callback(String(d), `day_${year}_${month}_${d}`));
+    if (row.length === 7) { rows.push([...row]); row.length = 0; }
+  }
+  if (row.length) rows.push([...row]);
+  return rows;
+}
+
 bot.use(session({ defaultSession: () => ({ step: 'lang', data: {}, lang: 'ru' }) }));
 
-// /start — til tanlash
+// /start
 bot.start(async (ctx) => {
   ctx.session = { step: 'lang', data: {}, lang: 'ru' };
-  await ctx.reply(
-    T.ru.chooseLang,
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('🇷🇺 Русский', 'lang_ru'),
-        Markup.button.callback("🇺🇿 O'zbek", 'lang_uz')
-      ]
-    ])
-  );
+  await ctx.reply(T.ru.chooseLang, Markup.inlineKeyboard([
+    [Markup.button.callback('🇷🇺 Русский', 'lang_ru'), Markup.button.callback("🇺🇿 O'zbek", 'lang_uz')]
+  ]));
 });
 
-// Til tanlash
+// Til
 bot.action('lang_ru', async (ctx) => {
-  ctx.session.lang = 'ru';
-  ctx.session.step = 'welcome';
+  ctx.session.lang = 'ru'; ctx.session.step = 'welcome';
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
-    T.ru.welcome,
-    Markup.inlineKeyboard([[Markup.button.callback(T.ru.start, 'start_apply')]])
-  );
+  await ctx.editMessageText(T.ru.welcome, Markup.inlineKeyboard([[Markup.button.callback(T.ru.start, 'start_apply')]]));
 });
-
 bot.action('lang_uz', async (ctx) => {
-  ctx.session.lang = 'uz';
-  ctx.session.step = 'welcome';
+  ctx.session.lang = 'uz'; ctx.session.step = 'welcome';
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
-    T.uz.welcome,
-    Markup.inlineKeyboard([[Markup.button.callback(T.uz.start, 'start_apply')]])
-  );
+  await ctx.editMessageText(T.uz.welcome, Markup.inlineKeyboard([[Markup.button.callback(T.uz.start, 'start_apply')]]));
 });
 
 // Boshlash
@@ -96,29 +124,23 @@ bot.action('start_apply', async (ctx) => {
   await ctx.answerCbQuery();
   try {
     const { rows } = await db.query('SELECT * FROM vacancies WHERE active = true ORDER BY id');
-    if (rows.length === 0) {
-      return ctx.reply(T[lang].noVacancies);
-    }
+    if (rows.length === 0) return ctx.reply(T[lang].noVacancies);
     ctx.session.step = 'vacancy';
-    const buttons = rows.map(v => [
-      Markup.button.callback(
-        `${v.position[lang]} — ${v.business_emoji} ${v.business} (${v.branch})`,
-        `vac_${v.id}`
-      )
-    ]);
+    const buttons = rows.map(v => [Markup.button.callback(
+      `${v.position[lang]} — ${v.business_emoji} ${v.business} (${v.branch})`, `vac_${v.id}`
+    )]);
     await ctx.editMessageText(T[lang].chooseVacancy, Markup.inlineKeyboard(buttons));
   } catch (err) {
     console.error('DB xato:', err.message);
-    await ctx.reply('❌ Xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.');
+    await ctx.reply('❌ Xatolik. Qayta urinib ko\'ring.');
   }
 });
 
-// Vakansiya tanlash
+// Vakansiya
 bot.action(/vac_(\d+)/, async (ctx) => {
   const { lang } = ctx.session;
   await ctx.answerCbQuery();
   const { rows } = await db.query('SELECT * FROM vacancies WHERE id = $1', [parseInt(ctx.match[1])]);
-  if (!rows[0]) return ctx.reply('❌ Vakansiya topilmadi.');
   const v = rows[0];
   ctx.session.data.vacancyId = v.id;
   ctx.session.data.vacancy = `${v.position[lang]} — ${v.business_emoji} ${v.business} (${v.branch})`;
@@ -127,21 +149,53 @@ bot.action(/vac_(\d+)/, async (ctx) => {
   await ctx.reply(T[lang].askName);
 });
 
-// Tuman tanlash
+// Tug'ilgan yil tanlash
+bot.action(/year_(\d+)/, async (ctx) => {
+  const { lang } = ctx.session;
+  await ctx.answerCbQuery();
+  ctx.session.data.birthYear = parseInt(ctx.match[1]);
+  await ctx.editMessageText(T[lang].askBirthMonth, Markup.inlineKeyboard(monthButtons(lang, ctx.session.data.birthYear)));
+});
+
+// Tug'ilgan oy tanlash
+bot.action(/month_(\d+)_(\d+)/, async (ctx) => {
+  const { lang } = ctx.session;
+  await ctx.answerCbQuery();
+  const year = parseInt(ctx.match[1]);
+  const month = parseInt(ctx.match[2]);
+  ctx.session.data.birthMonth = month;
+  await ctx.editMessageText(T[lang].askBirthDay, Markup.inlineKeyboard(dayButtons(year, month)));
+});
+
+// Tug'ilgan kun tanlash
+bot.action(/day_(\d+)_(\d+)_(\d+)/, async (ctx) => {
+  const { lang } = ctx.session;
+  await ctx.answerCbQuery();
+  const year = parseInt(ctx.match[1]);
+  const month = parseInt(ctx.match[2]);
+  const day = parseInt(ctx.match[3]);
+  const birth = `${String(day).padStart(2,'0')}.${String(month).padStart(2,'0')}.${year}`;
+  ctx.session.data.birth = birth;
+  ctx.session.step = 'district';
+  await ctx.editMessageText(`✅ ${birth}`);
+  const buttons = DISTRICTS[lang].map(d => [Markup.button.callback(d, `dist_${d}`)]);
+  await ctx.reply(T[lang].askDistrict, Markup.inlineKeyboard(buttons));
+});
+
+// Tuman
 bot.action(/dist_(.+)/, async (ctx) => {
   const { lang } = ctx.session;
   await ctx.answerCbQuery();
   ctx.session.data.district = ctx.match[1];
   ctx.session.step = 'contact';
   await ctx.editMessageText(`✅ ${ctx.session.data.district}`);
-  await ctx.reply(
-    T[lang].askContact,
-    Markup.keyboard([[Markup.button.contactRequest(T[lang].shareContact)]]).resize().oneTime()
-  );
+  await ctx.reply(T[lang].askContact, Markup.keyboard([
+    [Markup.button.contactRequest(T[lang].shareContact)]
+  ]).resize().oneTime());
   await ctx.reply(T[lang].orManual);
 });
 
-// Matn xabarlari
+// Matn
 bot.on('text', async (ctx) => {
   const { step, lang } = ctx.session;
   const text = ctx.message.text.trim();
@@ -150,23 +204,10 @@ bot.on('text', async (ctx) => {
     if (text.length < 3) return ctx.reply(T[lang].invalid);
     ctx.session.data.name = text;
     ctx.session.step = 'birth';
-    return ctx.reply(T[lang].askBirth);
+    return ctx.reply(T[lang].askBirth, Markup.inlineKeyboard(yearButtons()));
   }
 
-if (step === 'birth') {
-    ctx.session.data.birth = text;
-    ctx.session.step = 'district';
-    const buttons = DISTRICTS[lang].map(d => [Markup.button.callback(d, `dist_${d}`)]);
-    return ctx.reply(T[lang].askDistrict, Markup.inlineKeyboard(buttons));
-  }
-    }
-    ctx.session.data.birth = text;
-    ctx.session.step = 'district';
-    const buttons = DISTRICTS[lang].map(d => [Markup.button.callback(d, `dist_${d}`)]);
-    return ctx.reply(T[lang].askDistrict, Markup.inlineKeyboard(buttons));
-  }
-
-  if (step === 'contact' || step === 'contact_manual') {
+  if (step === 'contact') {
     ctx.session.data.contact = text;
     ctx.session.step = 'photo';
     await ctx.reply(`✅ ${text}`, Markup.removeKeyboard());
@@ -174,7 +215,7 @@ if (step === 'birth') {
   }
 });
 
-// Kontakt tugma orqali
+// Kontakt tugma
 bot.on('contact', async (ctx) => {
   const { lang } = ctx.session;
   if (ctx.session.step !== 'contact') return;
@@ -196,7 +237,7 @@ bot.on('photo', async (ctx) => {
   await ctx.reply(T[lang].askVoice);
 });
 
-// Ovozli xabar
+// Ovoz
 bot.on('voice', async (ctx) => {
   const { lang } = ctx.session;
   if (ctx.session.step !== 'voice') return ctx.reply(T[lang].voiceOnly);
@@ -217,14 +258,12 @@ bot.on('voice', async (ctx) => {
       ctx.session.data.vacancy, lang
     ]);
   } catch (err) {
-    console.error('DB saqlash xatosi:', err.message);
+    console.error('DB xato:', err.message);
   }
 
-  // HR ga xabar
   if (process.env.HR_CHAT_ID) {
     try {
-      await bot.telegram.sendMessage(
-        process.env.HR_CHAT_ID,
+      await bot.telegram.sendMessage(process.env.HR_CHAT_ID,
         `🆕 *Yangi ariza!*\n\n👤 ${ctx.session.data.name}\n💼 ${ctx.session.data.vacancy}\n📍 ${ctx.session.data.district}\n📱 ${ctx.session.data.contact}`,
         { parse_mode: 'Markdown' }
       );
@@ -232,12 +271,9 @@ bot.on('voice', async (ctx) => {
   }
 
   await ctx.reply(T[lang].done);
-  await ctx.reply(
-    T[lang].shareLink,
-    Markup.inlineKeyboard([[
-      Markup.button.url('✈️ Ulashish', `https://t.me/share/url?url=https://t.me/${ctx.botInfo.username}`)
-    ]])
-  );
+  await ctx.reply(T[lang].shareLink, Markup.inlineKeyboard([[
+    Markup.button.url('✈️ Ulashish', `https://t.me/share/url?url=https://t.me/${ctx.botInfo.username}`)
+  ]]));
 
   ctx.session = { step: 'lang', data: {}, lang };
 });
