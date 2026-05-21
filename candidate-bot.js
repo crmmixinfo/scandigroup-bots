@@ -5,10 +5,22 @@ const { Pool } = require('pg');
 const bot = new Telegraf(process.env.CANDIDATE_BOT_TOKEN);
 const db = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
+const TOTAL_STEPS = 7;
+
+const PRAISE = {
+  ru: ['🔥 Отлично!','✅ Принято!','💪 Записали!','👍 Хорошо!','✨ Супер!','🎯 Понял!','🙌 Класс!'],
+  uz: ['🔥 Zo\'r!','✅ Qabul!','💪 Yozib oldik!','👍 Yaxshi!','✨ Ajoyib!','🎯 Tushunarli!','🙌 Barakalla!']
+};
+
+const STEP_NAMES = {
+  ru: ['Вакансия','Имя','Дата рождения','Район','Контакт','Фото','Голосовое'],
+  uz: ['Vakansiya','Ism','Tug\'ilgan sana','Tuman','Kontakt','Rasm','Ovozli']
+};
+
 const T = {
   ru: {
     chooseLang: '🌐 Выберите язык / Tilni tanlang:',
-    welcome: '👋 Привет! Мы ищем сотрудников.\n\nКороткая анкета на 1 минуту — нажмите «Начать».',
+    welcome: '👋 Привет! Мы ищем сотрудников.\n\nКороткая анкета — нажмите «Начать».',
     start: '🚀 Начать',
     chooseVacancy: '🎯 Какая вакансия вас интересует?',
     noVacancies: 'Активных вакансий пока нет.',
@@ -23,10 +35,11 @@ const T = {
     askPhoto: '📸 Загрузите вашу фотографию:',
     askVoice: '🎤 Запишите голосовое о себе (до 60 сек):',
     done: '✅ Спасибо! Ваша анкета принята.\n\n📋 Скоро с вами свяжутся!\n\n🍀 Удачи!',
-    invalid: '❌ Неверный формат. Попробуйте ещё раз.',
+    invalid: '❌ Неверный формат.',
     photoOnly: '📸 Отправьте фотографию.',
     voiceOnly: '🎤 Отправьте голосовое сообщение.',
     shareLink: '👇 Поделитесь ботом:',
+    cancel: '❌ Анкета отменена. Нажмите /start чтобы начать заново.',
     months: ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'],
   },
   uz: {
@@ -50,6 +63,7 @@ const T = {
     photoOnly: '📸 Rasm yuboring.',
     voiceOnly: '🎤 Ovozli xabar yuboring.',
     shareLink: "👇 Botni ulashing:",
+    cancel: "❌ Ariza bekor qilindi. Qayta boshlash uchun /start bosing.",
     months: ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'],
   }
 };
@@ -59,16 +73,35 @@ const DISTRICTS = {
   ru: ["Бектемирский","Чиланзарский","Яшнободский","Мирободский","Мирзо Улугбека","Сергелийский","Алмазарский","Шайхантахурский","Учтепинский","Яккасарайский","Юнусабадский","Янгихаётский"]
 };
 
-// Yil tugmalari (1970-2006)
+// Progress panel
+function progress(step, lang) {
+  const filled = '▓';
+  const empty = '░';
+  const bar = filled.repeat(step) + empty.repeat(TOTAL_STEPS - step);
+  return `\n📊 ${bar} ${step}/${TOTAL_STEPS} — ${STEP_NAMES[lang][step-1]}`;
+}
+
+// Maqtov so'zi
+function praise(step, lang) {
+  return PRAISE[lang][(step - 1) % PRAISE[lang].length];
+}
+
+// Typing + delay
+async function typing(ctx, ms = 1000) {
+  await ctx.sendChatAction('typing');
+  await new Promise(r => setTimeout(r, ms));
+}
+
+// Yil tugmalari
 function yearButtons() {
-  const years = [];
+  const rows = [];
   const row = [];
   for (let y = 2006; y >= 1970; y--) {
     row.push(Markup.button.callback(String(y), `year_${y}`));
-    if (row.length === 4) { years.push([...row]); row.length = 0; }
+    if (row.length === 4) { rows.push([...row]); row.length = 0; }
   }
-  if (row.length) years.push([...row]);
-  return years;
+  if (row.length) rows.push([...row]);
+  return rows;
 }
 
 // Oy tugmalari
@@ -106,6 +139,13 @@ bot.start(async (ctx) => {
   ]));
 });
 
+// /cancel
+bot.command('cancel', async (ctx) => {
+  const lang = ctx.session?.lang || 'ru';
+  ctx.session = { step: 'lang', data: {}, lang };
+  await ctx.reply(T[lang].cancel);
+});
+
 // Til
 bot.action('lang_ru', async (ctx) => {
   ctx.session.lang = 'ru'; ctx.session.step = 'welcome';
@@ -129,9 +169,10 @@ bot.action('start_apply', async (ctx) => {
     const buttons = rows.map(v => [Markup.button.callback(
       `${v.position[lang]} — ${v.business_emoji} ${v.business} (${v.branch})`, `vac_${v.id}`
     )]);
-    await ctx.editMessageText(T[lang].chooseVacancy, Markup.inlineKeyboard(buttons));
+    const text = T[lang].chooseVacancy + progress(1, lang);
+    await ctx.editMessageText(text, Markup.inlineKeyboard(buttons));
   } catch (err) {
-    console.error('DB xato:', err.message);
+    console.error(err.message);
     await ctx.reply('❌ Xatolik. Qayta urinib ko\'ring.');
   }
 });
@@ -146,28 +187,27 @@ bot.action(/vac_(\d+)/, async (ctx) => {
   ctx.session.data.vacancy = `${v.position[lang]} — ${v.business_emoji} ${v.business} (${v.branch})`;
   ctx.session.step = 'name';
   await ctx.editMessageText(`✅ ${ctx.session.data.vacancy}`);
-  await ctx.reply(T[lang].askName);
+  await typing(ctx);
+  await ctx.reply(T[lang].askName + progress(2, lang));
 });
 
-// Tug'ilgan yil tanlash
+// Yil
 bot.action(/year_(\d+)/, async (ctx) => {
   const { lang } = ctx.session;
   await ctx.answerCbQuery();
   ctx.session.data.birthYear = parseInt(ctx.match[1]);
-  await ctx.editMessageText(T[lang].askBirthMonth, Markup.inlineKeyboard(monthButtons(lang, ctx.session.data.birthYear)));
+  await ctx.editMessageText(T[lang].askBirthMonth + progress(3, lang), Markup.inlineKeyboard(monthButtons(lang, ctx.session.data.birthYear)));
 });
 
-// Tug'ilgan oy tanlash
+// Oy
 bot.action(/month_(\d+)_(\d+)/, async (ctx) => {
   const { lang } = ctx.session;
   await ctx.answerCbQuery();
-  const year = parseInt(ctx.match[1]);
-  const month = parseInt(ctx.match[2]);
-  ctx.session.data.birthMonth = month;
-  await ctx.editMessageText(T[lang].askBirthDay, Markup.inlineKeyboard(dayButtons(year, month)));
+  ctx.session.data.birthMonth = parseInt(ctx.match[2]);
+  await ctx.editMessageText(T[lang].askBirthDay + progress(3, lang), Markup.inlineKeyboard(dayButtons(parseInt(ctx.match[1]), parseInt(ctx.match[2]))));
 });
 
-// Tug'ilgan kun tanlash
+// Kun
 bot.action(/day_(\d+)_(\d+)_(\d+)/, async (ctx) => {
   const { lang } = ctx.session;
   await ctx.answerCbQuery();
@@ -178,8 +218,9 @@ bot.action(/day_(\d+)_(\d+)_(\d+)/, async (ctx) => {
   ctx.session.data.birth = birth;
   ctx.session.step = 'district';
   await ctx.editMessageText(`✅ ${birth}`);
+  await typing(ctx);
   const buttons = DISTRICTS[lang].map(d => [Markup.button.callback(d, `dist_${d}`)]);
-  await ctx.reply(T[lang].askDistrict, Markup.inlineKeyboard(buttons));
+  await ctx.reply(T[lang].askDistrict + progress(4, lang), Markup.inlineKeyboard(buttons));
 });
 
 // Tuman
@@ -189,7 +230,8 @@ bot.action(/dist_(.+)/, async (ctx) => {
   ctx.session.data.district = ctx.match[1];
   ctx.session.step = 'contact';
   await ctx.editMessageText(`✅ ${ctx.session.data.district}`);
-  await ctx.reply(T[lang].askContact, Markup.keyboard([
+  await typing(ctx);
+  await ctx.reply(T[lang].askContact + progress(5, lang), Markup.keyboard([
     [Markup.button.contactRequest(T[lang].shareContact)]
   ]).resize().oneTime());
   await ctx.reply(T[lang].orManual);
@@ -204,18 +246,24 @@ bot.on('text', async (ctx) => {
     if (text.length < 3) return ctx.reply(T[lang].invalid);
     ctx.session.data.name = text;
     ctx.session.step = 'birth';
-    return ctx.reply(T[lang].askBirth, Markup.inlineKeyboard(yearButtons()));
+    await typing(ctx);
+    await ctx.reply(praise(2, lang));
+    await typing(ctx, 800);
+    return ctx.reply(T[lang].askBirth + progress(3, lang), Markup.inlineKeyboard(yearButtons()));
   }
 
   if (step === 'contact') {
     ctx.session.data.contact = text;
     ctx.session.step = 'photo';
+    await typing(ctx);
+    await ctx.reply(praise(5, lang));
+    await typing(ctx, 800);
     await ctx.reply(`✅ ${text}`, Markup.removeKeyboard());
-    return ctx.reply(T[lang].askPhoto);
+    return ctx.reply(T[lang].askPhoto + progress(6, lang));
   }
 });
 
-// Kontakt tugma
+// Kontakt
 bot.on('contact', async (ctx) => {
   const { lang } = ctx.session;
   if (ctx.session.step !== 'contact') return;
@@ -223,8 +271,11 @@ bot.on('contact', async (ctx) => {
   const username = ctx.from.username ? `@${ctx.from.username}` : '';
   ctx.session.data.contact = `${phone} ${username}`.trim();
   ctx.session.step = 'photo';
+  await typing(ctx);
+  await ctx.reply(praise(5, lang));
+  await typing(ctx, 800);
   await ctx.reply(`✅ ${ctx.session.data.contact}`, Markup.removeKeyboard());
-  await ctx.reply(T[lang].askPhoto);
+  await ctx.reply(T[lang].askPhoto + progress(6, lang));
 });
 
 // Rasm
@@ -233,8 +284,10 @@ bot.on('photo', async (ctx) => {
   if (ctx.session.step !== 'photo') return ctx.reply(T[lang].photoOnly);
   ctx.session.data.photoFileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
   ctx.session.step = 'voice';
-  await ctx.reply('✅ ' + (lang === 'ru' ? 'Фото получено!' : 'Rasm qabul qilindi!'));
-  await ctx.reply(T[lang].askVoice);
+  await typing(ctx);
+  await ctx.reply(praise(6, lang));
+  await typing(ctx, 800);
+  await ctx.reply(T[lang].askVoice + progress(7, lang));
 });
 
 // Ovoz
@@ -261,15 +314,20 @@ bot.on('voice', async (ctx) => {
     console.error('DB xato:', err.message);
   }
 
+  // HR ga rasm + matn
   if (process.env.HR_CHAT_ID) {
     try {
-      await bot.telegram.sendMessage(process.env.HR_CHAT_ID,
-        `🆕 *Yangi ariza!*\n\n👤 ${ctx.session.data.name}\n💼 ${ctx.session.data.vacancy}\n📍 ${ctx.session.data.district}\n📱 ${ctx.session.data.contact}`,
-        { parse_mode: 'Markdown' }
+      await bot.telegram.sendPhoto(process.env.HR_CHAT_ID,
+        ctx.session.data.photoFileId,
+        { caption: `🆕 *Yangi ariza!*\n\n👤 ${ctx.session.data.name}\n💼 ${ctx.session.data.vacancy}\n📍 ${ctx.session.data.district}\n📱 ${ctx.session.data.contact}\n🎂 ${ctx.session.data.birth}`, parse_mode: 'Markdown' }
       );
+      await bot.telegram.forwardMessage(process.env.HR_CHAT_ID, ctx.chat.id, ctx.message.message_id);
     } catch (e) {}
   }
 
+  await typing(ctx);
+  await ctx.reply(praise(7, lang));
+  await typing(ctx, 1000);
   await ctx.reply(T[lang].done);
   await ctx.reply(T[lang].shareLink, Markup.inlineKeyboard([[
     Markup.button.url('✈️ Ulashish', `https://t.me/share/url?url=https://t.me/${ctx.botInfo.username}`)
