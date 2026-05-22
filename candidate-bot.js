@@ -340,3 +340,30 @@ bot.launch({ dropPendingUpdates: true });
 console.log('✅ Candidate bot ishga tushdi — @Scandigroupbot');
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// HR buyruqlari
+const ADMINS = (process.env.ADMIN_IDS || '').split(',').map(Number);
+
+bot.command('hr', async (ctx) => {
+  if (!ADMINS.includes(ctx.from.id)) return;
+  await ctx.reply(
+    '📊 HR Panel:',
+    Markup.inlineKeyboard([[
+      Markup.button.url('📊 HR Panel ochish', process.env.MINI_APP_URL || 'https://google.com')
+    ]])
+  );
+});
+
+bot.command('add_hr', async (ctx) => {
+  if (!ADMINS.includes(ctx.from.id)) return;
+  const args = ctx.message.text.split(' ').slice(1);
+  if (args.length < 2) return ctx.reply('Foydalanish: /add_hr <tg_id> <role>');
+  await db.query(`INSERT INTO hr_users (tg_id, role, active, added_at) VALUES ($1,$2,true,NOW()) ON CONFLICT (tg_id) DO UPDATE SET role=$2, active=true`, [parseInt(args[0]), args[1]]);
+  await ctx.reply(`✅ HR qo'shildi: ${args[0]}`);
+});
+
+bot.command('stats', async (ctx) => {
+  if (!ADMINS.includes(ctx.from.id)) return;
+  const { rows } = await db.query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status='new') as yangi, COUNT(*) FILTER (WHERE status='accepted') as qabul FROM candidates`);
+  const s = rows[0];
+  await ctx.reply(`📊 Statistika:\n📋 Jami: ${s.total}\n🆕 Yangi: ${s.yangi}\n✅ Qabul: ${s.qabul}`);
+});
