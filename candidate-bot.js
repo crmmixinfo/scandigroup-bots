@@ -336,21 +336,14 @@ bot.on('voice', async (ctx) => {
   ctx.session = { step: 'lang', data: {}, lang };
 });
 
-bot.launch({ dropPendingUpdates: true });
-console.log('✅ Candidate bot ishga tushdi — @Scandigroupbot');
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
 // HR buyruqlari
 const ADMINS = (process.env.ADMIN_IDS || '').split(',').map(Number);
 
 bot.command('hr', async (ctx) => {
   if (!ADMINS.includes(ctx.from.id)) return;
-  await ctx.reply(
-    '📊 HR Panel:',
-    Markup.inlineKeyboard([[
-      Markup.button.url('📊 HR Panel ochish', process.env.MINI_APP_URL || 'https://google.com')
-    ]])
-  );
+  await ctx.reply('📊 HR Panel:', Markup.inlineKeyboard([[
+    Markup.button.url('📊 HR Panel ochish', process.env.MINI_APP_URL || 'https://google.com')
+  ]]));
 });
 
 bot.command('add_hr', async (ctx) => {
@@ -367,3 +360,9 @@ bot.command('stats', async (ctx) => {
   const s = rows[0];
   await ctx.reply(`📊 Statistika:\n📋 Jami: ${s.total}\n🆕 Yangi: ${s.yangi}\n✅ Qabul: ${s.qabul}`);
 });
+
+// ENG OXIRI
+bot.launch({ dropPendingUpdates: true });
+console.log('✅ Candidate bot ishga tushdi — @Scandigroupbot');
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
