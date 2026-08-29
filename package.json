@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node candidate-bot.js",
-    "hr": "node hr-bot.js"
+    "hr": "node hr-bot.js",
+    "onix": "node onix-bot.js",
+    "onix:schema": "psql \"$DATABASE_URL\" -f onix-schema.sql",
+    "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js"
   },
   "dependencies": {
     "telegraf": "^4.16.0",
