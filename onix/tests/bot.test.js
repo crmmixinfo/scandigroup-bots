@@ -16,9 +16,9 @@ Telegram.prototype.callApi = async function (method, payload = {}) {
 };
 const last = () => sent.length ? sent[sent.length - 1].text : '';
 
-const msg = (text, from) => bot.handleUpdate({ update_id: ++uid, message: {
+const msg = (text, from, username) => bot.handleUpdate({ update_id: ++uid, message: {
   message_id: ++mid, date: 1, chat: { id: from, type: 'private' },
-  from: { id: from, is_bot: false, first_name: 'T' }, text,
+  from: { id: from, is_bot: false, first_name: 'T', ...(username ? { username } : {}) }, text,
   // Telegram buyruqlarni entity bilan belgilaydi — bot.command() shunga tayanadi
   ...(text.startsWith('/') ? { entities: [{ offset: 0, length: text.split(' ')[0].length, type: 'bot_command' }] } : {}) } });
 
@@ -58,7 +58,8 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   // ═══ 1. RUXSATSIZ FOYDALANUVCHI ═══
   console.log('\n─── Ruxsat nazorati ───');
   sent = []; await msg('/start', 999);
-  ok(last().includes('ruxsat berilmagan'), 'notanish foydalanuvchi rad etildi');
+  ok(sent.some(x => x.text && x.text.includes('ruxsat berilmagan')), 'notanish foydalanuvchi rad etildi');
+  ok(sent.some(x => x.text && x.text.includes('Yangi foydalanuvchi')), 'adminga tasdiqlash so\'rovi ketdi');
   sent = []; await msg(K.MENU.income, 301);
   ok(last().includes('ochiq emas'), 'rahbar kirim kirita olmaydi');
   sent = []; await msg(K.MENU.pnl, 101);
@@ -170,6 +171,38 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   eq(opFlat.cat_name, 'Soliq', 'yo\'lda kategoriya nomi');
   eq(opFlat.group_name, 'Yangiobod', 'yo\'lda guruh nomi');
   eq(opFlat.category_name, 'null', 'podkategoriya bo\'sh');
+
+  // ═══ 6c. USERNAME BO'YICHA ULANISH ═══
+  console.log('\n─── Username bo\'yicha ro\'yxatga olish ───');
+  await db.addUser(1, 'Bosh admin', 'admin', 1);
+
+  sent = []; await msg('/add_user @gulnora_s staff Gulnora Sattorova', 1);
+  ok(last().includes("Kutish ro'yxatiga"), 'username kutish ro\'yxatiga yozildi');
+  eq((await db.listPendingUsers()).length, 1, 'kutayotganlar: 1');
+
+  // Hodim hali ulanmagan — kirolmaydi
+  sent = []; await msg('/start', 401, 'boshqa_odam');
+  ok(sent.some(x => x.text && x.text.includes('ruxsat berilmagan')), 'notanish odam kira olmadi');
+
+  // To'g'ri username bilan /start — avtomat ulanadi
+  sent = []; await msg('/start', 402, 'Gulnora_S');   // registr farq qilsa ham
+  ok(sent.some(x => x.text && x.text.includes('Xush kelibsiz')), 'username bo\'yicha tanildi');
+  const gul = await db.getUser(402);
+  eq(gul ? gul.full_name : null, 'Gulnora Sattorova', 'ismi kutish ro\'yxatidan olindi');
+  eq(gul.role, 'staff', 'roli olindi');
+  eq(gul.username, 'gulnora_s', 'username kichik harfda saqlandi');
+  eq((await db.listPendingUsers()).length, 0, 'kutish ro\'yxati tozalandi');
+  eq((await db.listAccounts({ kind:'podotchet', ownerTgId:402 })).length, 2, 'podotchyot hisoblari ochildi');
+
+  // Notanish odamni admin tugma bilan tasdiqlaydi
+  sent = []; await cb('ok:manager:401:Yangi%20Rahbar', 1);
+  const appr = await db.getUser(401);
+  eq(appr ? appr.role : null, 'manager', 'tugma bilan rahbar qilib qo\'shildi');
+  eq(appr.full_name, 'Yangi Rahbar', 'ismi tugmadan olindi');
+
+  // Rahbar bo'lmagan odam tasdiqlay olmasin
+  sent = []; await cb('ok:admin:403:Kimdir', 201);
+  eq((await db.getUser(403)) === null, true, 'hodim tasdiqlay olmadi');
 
   // ═══ 7. RAHBAR: HISOBOTLAR ═══
   console.log('\n─── Rahbar: hisobotlar ───');

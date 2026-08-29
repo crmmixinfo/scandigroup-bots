@@ -180,19 +180,52 @@ npm run onix:categories       # kategoriyalarni yuklash
 npm run onix                  # botni ishga tushirish
 ```
 
-Keyin Telegramda botga `/start` yuboring (siz `SUPER_ADMIN_ID` egasisiz) va
-jamoani qo'shing:
+Keyin Telegramda botga `/start` yuboring — siz `SUPER_ADMIN_ID` egasisiz.
+
+### Jamoani qo'shishning uch yo'li
+
+Bot `@username` ni raqamli ID ga aylantira olmaydi (Telegram bunga ruxsat
+bermaydi), shuning uchun uch xil qulay usul bor:
+
+**1. Username bo'yicha — ID kerak emas** *(eng qulay)*
 
 ```
-/add_user 111111111 cashier Rustam Karimov
-/add_user 222222222 staff   Ali Valiyev
-/add_user 333333333 staff   Vali Aliyev
-/add_user 444444444 staff   Gulnora Sattorova
-/add_user 555555555 manager Sardor Rahmonov
-/add_user 666666666 manager Dilshod Tursunov
+/add_user @rustam_k  cashier Rustam Karimov
+/add_user @ali_v     staff   Ali Valiyev
+/add_user @sardor_r  manager Sardor Rahmonov
 ```
 
-Har bir hodim o'z Telegram ID sini `/myid` orqali oladi.
+Odam kutish ro'yxatiga tushadi. U botga `/start` bosgan zahoti tizim uni
+username bo'yicha taniydi, haqiqiy ID bilan bog'laydi va sizga xabar beradi.
+Kutayotganlarni ko'rish: `/pending`, bekor qilish: `/cancel_pending @username`.
+
+**2. Tugma bilan tasdiqlash — hech narsa yozmasdan**
+
+Notanish odam botga `/start` bossa, sizga uning ismi, username va ID si
+**rol tugmalari bilan** keladi:
+
+```
+🆕 Yangi foydalanuvchi
+Ali Valiyev · @ali_v
+ID: 123456789
+
+[💼 Kassir] [🧾 Hodim]
+[👁 Rahbar] [👑 Admin]
+[✖️ Rad etish]
+```
+
+Tugmani bosasiz — qo'shildi, va odamga «tasdiqlandi» xabari ketadi.
+
+**3. Raqamli ID bo'yicha**
+
+Odam `/myid` yozsa o'z ID sini oladi:
+
+```
+/add_user 123456789 staff Ali Valiyev
+```
+
+Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
+(sum va $) avtomat ochiladi.
 
 ---
 
@@ -201,7 +234,10 @@ Har bir hodim o'z Telegram ID sini `/myid` orqali oladi.
 | Buyruq | Vazifasi |
 |---|---|
 | `/users` | Foydalanuvchilar ro'yxati |
-| `/add_user <id> <rol> <Ism>` | Qo'shish |
+| `/add_user @username <rol> <Ism>` | Qo'shish — `/start` da avtomat ulanadi |
+| `/add_user <id> <rol> <Ism>` | Qo'shish — darhol |
+| `/pending` | Kutayotganlar ro'yxati |
+| `/cancel_pending @username` | Kutish ro'yxatidan o'chirish |
 | `/remove_user <id>` | O'chirish (yozuvlari daftarda qoladi) |
 | `/accounts` | Hisoblar va qoldiqlar |
 | `/add_account <cash\|card\|bank> <UZS\|USD> <nom>` | Yangi kassa |
@@ -229,7 +265,7 @@ onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
 onix/tools/          kategoriyalarni matn faylidan yuklovchi
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
-onix/tests/          testlar (69 ta tekshiruv)
+onix/tests/          testlar (82 ta tekshiruv)
 ```
 
 ## 11. Testlar
@@ -241,7 +277,8 @@ psql "$TEST_DATABASE_URL" -f onix-schema.sql
 PGDATABASE=onix_test npm run onix:test
 ```
 
-Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar, kiritish sehrgarining
+Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar, username bo'yicha
+ulanish va tugma bilan tasdiqlash, kiritish sehrgarining
 har bir qadami, ikki va uch pog'onali kategoriyalar, podotchyot hisob-kitobi,
 valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, va **eng asosiysi** —
 yanvarda to'langan xarajat fevral foyda-zararida chiqishi.

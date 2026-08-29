@@ -28,6 +28,21 @@ CREATE TABLE IF NOT EXISTS onix_users (
   added_at   TIMESTAMP DEFAULT NOW()
 );
 
+-- Telegram username — hodim /start bosganda taniib olish uchun
+ALTER TABLE onix_users ADD COLUMN IF NOT EXISTS username TEXT;
+
+-- ---------- Kutilayotgan foydalanuvchilar ----------
+-- Bot @username ni raqamli ID ga aylantira olmaydi, shuning uchun admin
+-- odamni username bo'yicha oldindan yozib qo'yadi. Hodim botga /start
+-- bosgan zahoti tizim uni taniydi va haqiqiy tg_id bilan bog'laydi.
+CREATE TABLE IF NOT EXISTS onix_pending_users (
+  username   TEXT PRIMARY KEY,          -- @ belgisiz, kichik harflarda
+  full_name  TEXT NOT NULL,
+  role       TEXT NOT NULL CHECK (role IN ('admin','cashier','staff','manager')),
+  added_by   BIGINT,
+  added_at   TIMESTAMP DEFAULT NOW()
+);
+
 -- ---------- Hisoblar (kassalar) ----------
 CREATE TABLE IF NOT EXISTS onix_accounts (
   id           SERIAL PRIMARY KEY,

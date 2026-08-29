@@ -15,6 +15,9 @@ const all = async (sql, params) => (await q(sql, params)).rows;
 
 const SUPER_ADMIN_ID = parseInt(process.env.SUPER_ADMIN_ID, 10);
 
+// @ belgisi va harf registrini tozalaydi
+const normUsername = (u) => String(u || '').trim().replace(/^@/, '').toLowerCase() || null;
+
 async function getUser(tgId) {
   const row = await one('SELECT * FROM onix_users WHERE tg_id = $1 AND active = true', [tgId]);
   if (row) return row;
@@ -26,12 +29,13 @@ async function getUser(tgId) {
 const listUsers = () =>
   all("SELECT * FROM onix_users WHERE active = true ORDER BY array_position(ARRAY['admin','cashier','staff','manager'], role), full_name");
 
-async function addUser(tgId, fullName, role, addedBy) {
+async function addUser(tgId, fullName, role, addedBy, username = null) {
   const user = await one(`
-    INSERT INTO onix_users (tg_id, full_name, role, active, added_by)
-    VALUES ($1, $2, $3, true, $4)
-    ON CONFLICT (tg_id) DO UPDATE SET full_name = $2, role = $3, active = true
-    RETURNING *`, [tgId, fullName, role, addedBy]);
+    INSERT INTO onix_users (tg_id, full_name, role, active, added_by, username)
+    VALUES ($1, $2, $3, true, $4, $5)
+    ON CONFLICT (tg_id) DO UPDATE SET full_name = $2, role = $3, active = true,
+                                      username = COALESCE($5, onix_users.username)
+    RETURNING *`, [tgId, fullName, role, addedBy, normUsername(username)]);
 
   // Hodimga ikkala valyutada podotchyot hisobi ochiladi
   if (role === 'staff') await ensurePodotchet(tgId, fullName);
@@ -40,6 +44,37 @@ async function addUser(tgId, fullName, role, addedBy) {
 
 const deactivateUser = (tgId) =>
   q('UPDATE onix_users SET active = false WHERE tg_id = $1', [tgId]);
+
+// ---------- Username bo'yicha oldindan ro'yxatga olish ----------
+
+const addPendingUser = (username, fullName, role, addedBy) =>
+  one(`INSERT INTO onix_pending_users (username, full_name, role, added_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (username) DO UPDATE SET full_name = $2, role = $3, added_by = $4, added_at = NOW()
+       RETURNING *`, [normUsername(username), fullName, role, addedBy]);
+
+const listPendingUsers = () =>
+  all('SELECT * FROM onix_pending_users ORDER BY added_at');
+
+const removePendingUser = (username) =>
+  q('DELETE FROM onix_pending_users WHERE username = $1', [normUsername(username)]);
+
+// Hodim /start bosganda: username bo'yicha kutayotgan yozuvni topib,
+// haqiqiy tg_id bilan bog'laydi. Topilmasa null qaytaradi.
+async function bindPendingUser(tgId, username) {
+  const key = normUsername(username);
+  if (!key) return null;
+  const pending = await one('SELECT * FROM onix_pending_users WHERE username = $1', [key]);
+  if (!pending) return null;
+  const user = await addUser(tgId, pending.full_name, pending.role, pending.added_by, key);
+  await removePendingUser(key);
+  return user;
+}
+
+// Username o'zgargan bo'lsa yangilab turamiz — keyingi safar topilishi uchun
+const touchUsername = (tgId, username) =>
+  q('UPDATE onix_users SET username = $2 WHERE tg_id = $1 AND username IS DISTINCT FROM $2',
+    [tgId, normUsername(username)]);
 
 async function ensurePodotchet(tgId, fullName) {
   for (const currency of ['UZS', 'USD']) {
@@ -206,7 +241,8 @@ function countOperations({ from, to, createdBy, accountId } = {}) {
 
 module.exports = {
   pool, q, one, all, SUPER_ADMIN_ID,
-  getUser, listUsers, addUser, deactivateUser, ensurePodotchet,
+  getUser, listUsers, addUser, deactivateUser, ensurePodotchet, normUsername,
+  addPendingUser, listPendingUsers, removePendingUser, bindPendingUser, touchUsername,
   listAccounts, getAccount, balances,
   listGroups, listChildren, hasChildren, getCategory, addCategory, deactivateCategory, categoryTree,
   addOperation, getOperation, softDelete, listOperations, countOperations,

@@ -45,15 +45,69 @@ bot.use(async (ctx, next) => {
     return ctx.reply(`Sizning Telegram ID: <code>${ctx.from.id}</code>`, HTML);
   }
   ctx.user = await db.getUser(ctx.from.id);
-  if (!ctx.user) {
-    return ctx.reply(
-      `🔒 <b>ONIX</b> — moliyaviy tizim\n\n` +
-      `Sizga hali ruxsat berilmagan.\n\n` +
-      `Sizning ID: <code>${ctx.from.id}</code>\n` +
-      `Shu ID ni administratorga yuboring.`, HTML);
+
+  // Ro'yxatda yo'q — balki admin uni username bo'yicha oldindan yozib qo'ygandir
+  if (!ctx.user && ctx.from.username) {
+    ctx.user = await db.bindPendingUser(ctx.from.id, ctx.from.username);
+    if (ctx.user) {
+      await ctx.reply(
+        `✅ <b>Xush kelibsiz, ${f.esc(ctx.user.full_name)}!</b>\n\n` +
+        `Sizni <code>@${f.esc(ctx.from.username)}</code> bo'yicha tanidim.\n` +
+        `Rol: ${ROLE_LABEL[ctx.user.role]}`, HTML);
+      await notifyAdmins(ctx,
+        `🔗 <b>Bog'landi</b>\n\n${f.esc(ctx.user.full_name)} ` +
+        `(@${f.esc(ctx.from.username)}) tizimga kirdi.\n` +
+        `ID: <code>${ctx.from.id}</code> · ${ROLE_LABEL[ctx.user.role]}`);
+    }
   }
+
+  if (!ctx.user) return askAdminToApprove(ctx);
+
+  // Username o'zgargan bo'lsa yangilab qo'yamiz
+  if (ctx.from.username) await db.touchUsername(ctx.from.id, ctx.from.username);
   return next();
 });
+
+// Notanish odam botga kirdi — adminlarga rol tugmalari bilan xabar
+async function askAdminToApprove(ctx) {
+  const who = ctx.from;
+  const uname = who.username ? `@${who.username}` : null;
+  const name = [who.first_name, who.last_name].filter(Boolean).join(' ') || 'Nomsiz';
+
+  await ctx.reply(
+    `🔒 <b>ONIX</b> — moliyaviy tizim\n\n` +
+    `Sizga hali ruxsat berilmagan.\n` +
+    `So'rov administratorga yuborildi — tasdiqlashini kuting.\n\n` +
+    `Sizning ID: <code>${who.id}</code>`, HTML);
+
+  // Bir odam qayta-qayta /start bossa, adminni bezovta qilmaymiz
+  if (ctx.session.approvalSent) return;
+  ctx.session.approvalSent = true;
+
+  const payload = `${who.id}:${encodeURIComponent(name).slice(0, 40)}`;
+  await notifyAdmins(ctx,
+    `🆕 <b>Yangi foydalanuvchi</b>\n\n` +
+    `${f.esc(name)}${uname ? ` · <code>${f.esc(uname)}</code>` : ''}\n` +
+    `ID: <code>${who.id}</code>\n\n` +
+    `Rolni tanlang:`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback('💼 Kassir', `ok:cashier:${payload}`),
+       Markup.button.callback('🧾 Hodim', `ok:staff:${payload}`)],
+      [Markup.button.callback('👁 Rahbar', `ok:manager:${payload}`),
+       Markup.button.callback('👑 Admin', `ok:admin:${payload}`)],
+      [Markup.button.callback('✖️ Rad etish', `ok:no:${payload}`)],
+    ]));
+}
+
+async function notifyAdmins(ctx, text, extra) {
+  const admins = (await db.listUsers()).filter(u => u.role === 'admin');
+  const ids = new Set(admins.map(a => String(a.tg_id)));
+  if (db.SUPER_ADMIN_ID) ids.add(String(db.SUPER_ADMIN_ID));
+  for (const id of ids) {
+    if (String(id) === String(ctx.from.id)) continue;
+    await ctx.telegram.sendMessage(id, text, { ...HTML, ...(extra || {}) }).catch(() => {});
+  }
+}
 
 // ================= /start =================
 
@@ -341,6 +395,28 @@ bot.action('cancel', async (ctx) => {
 });
 
 bot.action('noop', (ctx) => ctx.answerCbQuery());
+
+// --- Yangi foydalanuvchini rol tugmasi bilan tasdiqlash ---
+bot.action(/^ok:(cashier|staff|manager|admin|no):(\d+):(.*)$/, async (ctx) => {
+  if (!isAdmin(ctx.user)) return ctx.answerCbQuery("Faqat administrator uchun", { show_alert: true });
+  const [, role, tgId, rawName] = ctx.match;
+  const name = decodeURIComponent(rawName) || 'Nomsiz';
+
+  if (role === 'no') {
+    await ctx.answerCbQuery('Rad etildi');
+    return ctx.editMessageText(`✖️ Rad etildi: ${f.esc(name)} (<code>${tgId}</code>)`, HTML);
+  }
+
+  const u = await db.addUser(parseInt(tgId, 10), name, role, ctx.user.tg_id);
+  await ctx.answerCbQuery('Qo\'shildi');
+  await ctx.editMessageText(
+    `✅ <b>${f.esc(u.full_name)}</b> qo'shildi\n${ROLE_LABEL[u.role]} · <code>${u.tg_id}</code>` +
+    (role === 'staff' ? "\n👛 Podotchyot hisoblari ochildi." : '') +
+    `\n\n<i>Ismni to'g'rilash: /add_user ${u.tg_id} ${role} To'liq Ism</i>`, HTML);
+
+  return ctx.telegram.sendMessage(u.tg_id,
+    `✅ <b>Tasdiqlandi!</b>\n\nRol: ${ROLE_LABEL[u.role]}\n\n/start bosing.`, HTML).catch(() => {});
+});
 
 // --- Saqlash ---
 bot.action('save', async (ctx) => {
@@ -635,7 +711,9 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `⚙️ <b>Sozlamalar</b>\n\n` +
   `<b>Foydalanuvchilar</b>\n` +
   `<code>/users</code> — ro'yxat\n` +
-  `<code>/add_user &lt;tg_id&gt; &lt;rol&gt; &lt;Ism Familiya&gt;</code>\n` +
+  `<code>/add_user @username &lt;rol&gt; &lt;Ism&gt;</code> — /start da ulanadi\n` +
+  `<code>/add_user &lt;tg_id&gt; &lt;rol&gt; &lt;Ism&gt;</code> — darhol\n` +
+  `<code>/pending</code> — kutayotganlar\n` +
   `<code>/remove_user &lt;tg_id&gt;</code>\n\n` +
   `Rollar: <code>admin</code> · <code>cashier</code> · <code>staff</code> · <code>manager</code>\n\n` +
   `<b>Hisoblar</b>\n` +
@@ -662,22 +740,70 @@ bot.command('users', adminOnly(async (ctx) => {
   const rows = await db.listUsers();
   if (!rows.length) return ctx.reply("Ro'yxat bo'sh.");
   const text = rows.map(u =>
-    `${ROLE_LABEL[u.role]}\n  <b>${f.esc(u.full_name)}</b>\n  <code>${u.tg_id}</code>`).join('\n\n');
-  return ctx.reply(`👥 <b>Foydalanuvchilar</b>\n\n${text}`, HTML);
+    `${ROLE_LABEL[u.role]}\n  <b>${f.esc(u.full_name)}</b>\n  <code>${u.tg_id}</code>` +
+    (u.username ? ` · <code>@${f.esc(u.username)}</code>` : '')).join('\n\n');
+  const waiting = await db.listPendingUsers();
+  return ctx.reply(`👥 <b>Foydalanuvchilar</b>\n\n${text}` +
+    (waiting.length ? `\n\n⏳ Kutayotganlar: ${waiting.length} ta — /pending` : ''), HTML);
 }));
 
 bot.command('add_user', adminOnly(async (ctx) => {
-  const [tgId, role, ...name] = args(ctx);
-  if (!tgId || !role || !name.length) {
-    return ctx.reply('Foydalanish:\n<code>/add_user 123456789 staff Ali Valiyev</code>', HTML);
+  const [who, role, ...name] = args(ctx);
+  if (!who || !role || !name.length) {
+    return ctx.reply(
+      "Foydalanish — ikki xil:\n\n" +
+      "<b>1. Username bo'yicha</b> (ID ni bilmasangiz)\n" +
+      "<code>/add_user @ali_valiyev staff Ali Valiyev</code>\n" +
+      "<i>Hodim /start bosgan zahoti tizim uni o'zi taniydi.</i>\n\n" +
+      "<b>2. Raqamli ID bo'yicha</b>\n" +
+      "<code>/add_user 123456789 staff Ali Valiyev</code>\n\n" +
+      "Rollar: <code>cashier</code> · <code>staff</code> · <code>manager</code> · <code>admin</code>", HTML);
   }
   if (!['admin', 'cashier', 'staff', 'manager'].includes(role)) {
     return ctx.reply('❌ Rol: admin | cashier | staff | manager');
   }
-  const u = await db.addUser(parseInt(tgId, 10), name.join(' '), role, ctx.user.tg_id);
+  const fullName = name.join(' ');
+
+  // Raqamli ID — darhol qo'shamiz
+  if (/^\d+$/.test(who)) {
+    const u = await db.addUser(parseInt(who, 10), fullName, role, ctx.user.tg_id);
+    return ctx.reply(
+      `✅ Qo'shildi\n\n<b>${f.esc(u.full_name)}</b>\n${ROLE_LABEL[u.role]}\n<code>${u.tg_id}</code>` +
+      (role === 'staff' ? "\n\n👛 Podotchyot hisoblari (sum va $) ochildi." : ''), HTML);
+  }
+
+  // Username — kutish ro'yxatiga yozamiz, /start da bog'lanadi
+  const key = db.normUsername(who);
+  if (!key || !/^[a-z0-9_]{4,32}$/.test(key)) {
+    return ctx.reply("❌ Username noto'g'ri. Misol: <code>@ali_valiyev</code>", HTML);
+  }
+  const existing = await db.one('SELECT * FROM onix_users WHERE username = $1 AND active', [key]);
+  if (existing) {
+    return ctx.reply(`ℹ️ <code>@${f.esc(key)}</code> allaqachon tizimda: ` +
+      `<b>${f.esc(existing.full_name)}</b> (<code>${existing.tg_id}</code>)`, HTML);
+  }
+  await db.addPendingUser(key, fullName, role, ctx.user.tg_id);
   return ctx.reply(
-    `✅ Qo'shildi\n\n<b>${f.esc(u.full_name)}</b>\n${ROLE_LABEL[u.role]}\n<code>${u.tg_id}</code>` +
-    (role === 'staff' ? "\n\n👛 Podotchyot hisoblari (sum va $) ochildi." : ''), HTML);
+    `⏳ <b>Kutish ro'yxatiga qo'shildi</b>\n\n` +
+    `<b>${f.esc(fullName)}</b>\n${ROLE_LABEL[role]}\n<code>@${f.esc(key)}</code>\n\n` +
+    `Endi shu odam botga <code>/start</code> bossin — tizim uni o'zi taniydi va ulaydi.\n` +
+    `Kutayotganlar ro'yxati: /pending`, HTML);
+}));
+
+bot.command('pending', adminOnly(async (ctx) => {
+  const rows = await db.listPendingUsers();
+  if (!rows.length) return ctx.reply("✅ Kutayotgan hech kim yo'q.");
+  return ctx.reply(
+    `⏳ <b>Kutayotganlar</b>\n<i>Botga /start bosishsa avtomat ulanadi</i>\n\n` +
+    rows.map(r => `<code>@${f.esc(r.username)}</code>\n  ${f.esc(r.full_name)} — ${ROLE_LABEL[r.role]}`).join('\n\n') +
+    `\n\nBekor qilish: <code>/cancel_pending @username</code>`, HTML);
+}));
+
+bot.command('cancel_pending', adminOnly(async (ctx) => {
+  const [who] = args(ctx);
+  if (!who) return ctx.reply('Foydalanish: <code>/cancel_pending @ali_valiyev</code>', HTML);
+  await db.removePendingUser(who);
+  return ctx.reply(`✅ Kutish ro'yxatidan o'chirildi: <code>${f.esc(who)}</code>`, HTML);
 }));
 
 bot.command('remove_user', adminOnly(async (ctx) => {
