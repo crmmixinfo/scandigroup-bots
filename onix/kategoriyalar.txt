@@ -1,16 +1,20 @@
 # ONIX — kategoriyalar daraxti
 #
 # Ko'rinishi:   GURUH > KATEGORIYA > podkategoriya1, podkategoriya2, ...
+#      yoki:    GURUH > kategoriya1, kategoriya2          (podkategoriyasiz)
+#
+# Operatsiya har doim eng pastki tugunga (bargga) yoziladi.
+#
 # Yuklash:      npm run onix:categories
 # Tekshirish:   npm run onix:categories -- --dry     (bazaga yozmaydi)
 #
 # Qayta yuklash xavfsiz — mavjud yozuvlar takrorlanmaydi, faqat yangilari qo'shiladi.
-# Qator o'chirilsa baza'dan o'chmaydi; yashirish uchun botda /del_cat <id>.
+# Qator o'chirilsa bazadan o'chmaydi; yashirish uchun botda /del_cat <id>.
 
 KIRIM
 
 Onix bussines center > Ijara to'lovi > mijoz nomi
-Ta'sischidan > Humoyun aka > Kirim
+Ta'sischidan > Humoyun aka
 
 
 CHIQIM
@@ -18,3 +22,19 @@ CHIQIM
 Onix xarajatlar uchun > Asosiy vositalar > Ta'mirlash, Asosiy vositalar, Usta haqqi
 Onix xarajatlar uchun > Komunal to'lovlar > Elektr energiya, Suv, Gaz, Chiqindi, Internet
 Onix xarajatlar uchun > Oylik > Xodimlar maoshi
+Onix xarajatlar uchun > Xo'jalik xarajatlari > Salfetka, Tozalik mahsulotlari, Musr paket, Xojat qog'ozi, Pol sochig'i, Delfin sochig'i, Sovun, Xojatxona uchun suyuq sovun, Gigienik qo'lqop, Idish tovoq uchun gel, Kanstovar, Batareka pult uchun, Ichimlik suvi 20l
+Onix xarajatlar uchun > Boshqa xarajatlar > Benzin yengil avtomobil uchun, Yandex, Bog' uchun, Ichimlik suvi (napitka)
+
+Yangiobod > Soliq, Marketing
+
+Eko Drob > Eko Drob xarajatlari uchun
+
+Depo Mall > Smm xizmati, Xodimlar oyligi, Depo Mall xarajatlari uchun
+
+Strong Well > Xujjatlar uchun
+
+Chorva > Chorva xarajatlari > Cho'pon ish xaqi, Yem, Chorva xarajatlari uchun
+
+Boshqa xarajatlar > Kurs farqi, Bank xizmati
+
+Divident > Humoyun aka > O'zlariga, Dacha uchun, Dilxush, Tadbirkor, Choyhona, Avtomobil xarajatlari, Voditel, Ehson

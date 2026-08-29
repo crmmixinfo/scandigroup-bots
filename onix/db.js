@@ -88,15 +88,22 @@ const listGroups = (flow) =>
 const listChildren = (parentId) =>
   all('SELECT * FROM onix_categories WHERE parent_id = $1 AND active = true ORDER BY sort_order, id', [parentId]);
 
-// Podkategoriya + uning kategoriyasi va guruhi
+// Tugun + uning to'liq yo'li (guruh › kategoriya › podkategoriya)
 const getCategory = (id) =>
-  one(`SELECT c.*,
-              p.id AS cat_id,   p.name AS cat_name,   p.emoji AS cat_emoji,
-              g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji
-       FROM onix_categories c
-       LEFT JOIN onix_categories p ON p.id = c.parent_id
+  one(`SELECT n.*,
+              COALESCE(g.id, p.id)       AS group_id,
+              COALESCE(g.name, p.name)   AS group_name,
+              COALESCE(g.emoji, p.emoji) AS group_emoji,
+              CASE WHEN g.id IS NOT NULL THEN p.id   ELSE n.id   END AS cat_id,
+              CASE WHEN g.id IS NOT NULL THEN p.name ELSE n.name END AS cat_name
+       FROM onix_categories n
+       LEFT JOIN onix_categories p ON p.id = n.parent_id
        LEFT JOIN onix_categories g ON g.id = p.parent_id
-       WHERE c.id = $1`, [id]);
+       WHERE n.id = $1`, [id]);
+
+// Tugunning ostida aktiv bolasi bormi (barg ekanini aniqlash uchun)
+const hasChildren = async (id) =>
+  (await one('SELECT 1 FROM onix_categories WHERE parent_id = $1 AND active LIMIT 1', [id])) !== null;
 
 const addCategory = (parentId, level, name, flow, emoji) =>
   one(`INSERT INTO onix_categories (parent_id, level, name, flow, emoji) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
@@ -140,15 +147,15 @@ const getOperation = (id) =>
   one(`SELECT o.*,
               a.name AS account_name,  a.emoji AS account_emoji,
               t.name AS to_account_name,
-              c.name AS category_name,
-              p.name AS cat_name,   p.emoji AS cat_emoji,
-              g.name AS group_name, g.emoji AS group_emoji,
+              COALESCE(g.name, p.name) AS group_name,
+              CASE WHEN g.id IS NOT NULL THEN p.name ELSE n.name END AS cat_name,
+              CASE WHEN g.id IS NOT NULL THEN n.name END AS category_name,
               u.full_name AS author_name
        FROM onix_operations o
        JOIN onix_accounts a  ON a.id = o.account_id
        LEFT JOIN onix_accounts t ON t.id = o.to_account_id
-       LEFT JOIN onix_categories c ON c.id = o.category_id
-       LEFT JOIN onix_categories p ON p.id = c.parent_id
+       LEFT JOIN onix_categories n ON n.id = o.category_id
+       LEFT JOIN onix_categories p ON p.id = n.parent_id
        LEFT JOIN onix_categories g ON g.id = p.parent_id
        LEFT JOIN onix_users u ON u.tg_id = o.created_by
        WHERE o.id = $1`, [id]);
@@ -171,15 +178,15 @@ function listOperations({ from, to, createdBy, accountId, limit = 30, offset = 0
     SELECT o.*,
            a.name AS account_name, a.emoji AS account_emoji,
            t.name AS to_account_name,
-           c.name AS category_name,
-           p.name AS cat_name,   p.emoji AS cat_emoji,
-           g.name AS group_name, g.emoji AS group_emoji,
+           COALESCE(g.name, p.name) AS group_name,
+           CASE WHEN g.id IS NOT NULL THEN p.name ELSE n.name END AS cat_name,
+           CASE WHEN g.id IS NOT NULL THEN n.name END AS category_name,
            u.full_name AS author_name
     FROM onix_operations o
     JOIN onix_accounts a  ON a.id = o.account_id
     LEFT JOIN onix_accounts t ON t.id = o.to_account_id
-    LEFT JOIN onix_categories c ON c.id = o.category_id
-    LEFT JOIN onix_categories p ON p.id = c.parent_id
+    LEFT JOIN onix_categories n ON n.id = o.category_id
+    LEFT JOIN onix_categories p ON p.id = n.parent_id
     LEFT JOIN onix_categories g ON g.id = p.parent_id
     LEFT JOIN onix_users u ON u.tg_id = o.created_by
     WHERE ${where.join(' AND ')}
@@ -201,6 +208,6 @@ module.exports = {
   pool, q, one, all, SUPER_ADMIN_ID,
   getUser, listUsers, addUser, deactivateUser, ensurePodotchet,
   listAccounts, getAccount, balances,
-  listGroups, listChildren, getCategory, addCategory, deactivateCategory, categoryTree,
+  listGroups, listChildren, hasChildren, getCategory, addCategory, deactivateCategory, categoryTree,
   addOperation, getOperation, softDelete, listOperations, countOperations,
 };

@@ -13,6 +13,13 @@
 //
 //   GURUH > KATEGORIYA > podkategoriyalar (vergul bilan)
 //
+// Uchinchi pog'ona shart emas — podkategoriyasiz ham bo'ladi:
+//
+//   Yangiobod > Soliq, Marketing
+//   Strong Well > Xujjatlar uchun
+//
+// Bunda operatsiya kategoriyaning o'ziga yoziladi.
+//
 // Ishlatish:
 //   node onix/tools/import-categories.js kategoriyalar.txt          — bazaga yozadi
 //   node onix/tools/import-categories.js kategoriyalar.txt --dry    — faqat ko'rsatadi
@@ -43,14 +50,22 @@ function parse(text) {
     if (!flow) { problems.push(`${i + 1}-qator: KIRIM yoki CHIQIM sarlavhasidan oldin — «${line}»`); return; }
 
     const parts = line.split('>').map(x => x.trim()).filter(Boolean);
-    if (parts.length < 3) {
-      problems.push(`${i + 1}-qator: uchta pog'ona kerak (guruh > kategoriya > podkategoriya) — «${line}»`);
+    if (parts.length < 2) {
+      problems.push(`${i + 1}-qator: kamida «guruh > kategoriya» kerak — «${line}»`);
       return;
     }
 
-    const [group, cat, ...rest] = parts;
-    const subs = rest.join(' > ').split(',').map(x => x.trim()).filter(Boolean);
-    out.push({ flow, group, cat, subs });
+    const list = (text) => text.split(',').map(x => x.trim()).filter(Boolean);
+
+    if (parts.length === 2) {
+      // GURUH > kat1, kat2 — podkategoriyasiz, operatsiya kategoriyaning o'ziga yoziladi
+      const [group, cats] = parts;
+      for (const cat of list(cats)) out.push({ flow, group, cat, subs: [] });
+    } else {
+      // GURUH > KATEGORIYA > sub1, sub2
+      const [group, cat, ...rest] = parts;
+      out.push({ flow, group, cat, subs: list(rest.join(' > ')) });
+    }
   });
 
   return { rows: out, problems };

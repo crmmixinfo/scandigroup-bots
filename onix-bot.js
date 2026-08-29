@@ -158,7 +158,8 @@ async function ask(ctx) {
 
     case 'sub': {
       const rows = await db.listChildren(d.catId);
-      if (!rows.length) return fail(ctx, `«${d.catName}» kategoriyasida podkategoriya yo'q.`);
+      // Podkategoriyasi yo'q kategoriya — operatsiya uning o'ziga yoziladi
+      if (!rows.length) { d.categoryId = d.catId; d.categoryName = null; return advance(ctx); }
       return ctx.reply(`🗂 ${f.esc(d.groupName)} · ${f.esc(d.catName)}\n\n<b>Podkategoriyani</b> tanlang:`,
         { ...HTML, ...K.subCategories(rows) });
     }

@@ -7,7 +7,11 @@ const f  = require('../format');
 
 let pass = 0, fail = 0;
 const eq = (got, want, label) => {
-  const ok = Math.abs(Number(got) - Number(want)) < 0.01;
+  // Sonlar uchun yaqinlik, matn uchun aniq moslik
+  const numeric = typeof want === 'number';
+  const ok = numeric
+    ? Math.abs(Number(got) - Number(want)) < 0.01
+    : String(got) === String(want);
   console.log(`${ok ? '✅' : '❌'} ${label}${ok ? '' : `  kutilgan=${want} olindi=${got}`}`);
   ok ? pass++ : fail++;
 };
@@ -26,6 +30,8 @@ async function seedTree() {
   await mk(c1, 3, 'Oziq-ovqat', 'expense');
   const c2 = await mk(ge, 2, 'Ijara va kommunal', 'expense');
   await mk(c2, 3, 'Ijara haqi', 'expense');
+  // Podkategoriyasiz kategoriya — «Yangiobod > Soliq» kabi
+  await mk(await mk(null, 1, 'Yangiobod', 'expense'), 2, 'Soliq', 'expense');
 }
 const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE name=$1', [name])).id;
 
@@ -101,6 +107,23 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   eq(ali.received, 5_000_000, 'Ali olgan');
   eq(ali.spent,    3_000_000, 'Ali sarflagan');
   eq(ali.balance,  2_000_000, 'Ali qo\'lidagi qoldiq');
+
+  console.log('\n─── PODKATEGORIYASIZ KATEGORIYA ───');
+  const soliqId = (await db.one("SELECT id FROM onix_categories WHERE name='Soliq' AND level=2")).id;
+  await db.addOperation({ type:'expense', account_id:plastik, category_id:soliqId,
+    amount:1_500_000, currency:'UZS', paid_at:'2026-01-20', period:JAN, created_by:101 });
+
+  const plS = await R.profitLoss(JAN, 'UZS');
+  const yangiobod = plS.expense.find(g => g.name === 'Yangiobod');
+  eq(yangiobod ? 1 : 0, 1, 'guruh hisobotda chiqdi');
+  eq(yangiobod.total, 1_500_000, 'guruh jami');
+  eq(yangiobod.cats.length, 1, 'bitta kategoriya');
+  eq(yangiobod.cats[0].name, 'Soliq', 'kategoriya nomi');
+  eq(yangiobod.cats[0].subs.length, 0, 'podkategoriya yo\'q — bo\'sh');
+  eq(plS.costs, 4_500_000, 'jami xarajat 3 mln + 1.5 mln');
+
+  const cfS = await R.cashFlow('2026-01-01', '2026-01-31', 'UZS');
+  eq(cfS.expense.find(g => g.name === 'Yangiobod').total, 1_500_000, 'pul oqimida ham ko\'rindi');
 
   console.log('\n─── KELGUSI OYGA YOZILGANLAR ───');
   const def = await R.deferred('UZS', JAN);

@@ -89,16 +89,27 @@ Yangi kassa qo'shish: `/add_account card USD Plastik Anor`
 GURUH  ›  KATEGORIYA  ›  PODKATEGORIYA
 ```
 
-Masalan:
+Uchinchi pog'ona **shart emas** — ba'zi kategoriyalar bo'linmaydi:
 
 ```
-Onix xarajatlar uchun  ›  Komunal to'lovlar  ›  Elektr energiya
-Onix bussines center   ›  Ijara to'lovi      ›  mijoz nomi
+Onix xarajatlar uchun  ›  Komunal to'lovlar  ›  Elektr energiya    (3 pog'ona)
+Yangiobod              ›  Soliq                                    (2 pog'ona)
+Ta'sischidan           ›  Humoyun aka                              (2 pog'ona)
 ```
 
-Operatsiya **har doim podkategoriyaga** yoziladi — buni bazaning o'zi trigger bilan
-kafolatlaydi. Hisobotlar uchala pog'ona kesimida jamlanadi: guruh jami,
-kategoriya jami, podkategoriya tafsiloti.
+Operatsiya **har doim eng pastki tugunga (bargga)** yoziladi. Baza triggeri
+uchta narsani kafolatlaydi:
+
+- guruhga (1-daraja) hech qachon yozilmaydi;
+- ostida podkategoriyasi bor kategoriyaga yozilmaydi — bo'lmasa jami ikki
+  marta hisoblanardi;
+- podkategoriyasiz kategoriyaga bemalol yoziladi.
+
+Botda ham shunday: podkategoriyasi bo'lmagan kategoriya tanlansa, ortiqcha
+qadam so'ralmaydi — to'g'ridan-to'g'ri summaga o'tadi.
+
+Hisobotlar mavjud pog'onalar kesimida jamlanadi: guruh jami → kategoriya
+jami → (bo'lsa) podkategoriya tafsiloti.
 
 ### Ro'yxatni tahrirlash
 
@@ -108,14 +119,17 @@ Manba — `onix/kategoriyalar.txt`. Bitta qator = bitta kategoriya yo'li:
 KIRIM
 
 Onix bussines center > Ijara to'lovi > Mijoz A, Mijoz B, Mijoz C
-Ta'sischidan > Humoyun aka > Kirim
+Ta'sischidan > Humoyun aka
 
 CHIQIM
 
-Onix xarajatlar uchun > Asosiy vositalar > Ta'mirlash, Asosiy vositalar, Usta haqqi
 Onix xarajatlar uchun > Komunal to'lovlar > Elektr energiya, Suv, Gaz, Chiqindi, Internet
-Onix xarajatlar uchun > Oylik > Xodimlar maoshi
+Yangiobod > Soliq, Marketing
+Strong Well > Xujjatlar uchun
 ```
+
+Ikkinchi qatordagi `Yangiobod > Soliq, Marketing` — bitta guruh ostida ikkita
+podkategoriyasiz kategoriya. Vergul oxirgi pog'onani ajratadi.
 
 ```bash
 npm run onix:categories -- --dry   # avval tekshiring — bazaga yozmaydi
@@ -215,7 +229,7 @@ onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
 onix/tools/          kategoriyalarni matn faylidan yuklovchi
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
-onix/tests/          testlar (56 ta tekshiruv)
+onix/tests/          testlar (69 ta tekshiruv)
 ```
 
 ## 11. Testlar
@@ -228,6 +242,6 @@ PGDATABASE=onix_test npm run onix:test
 ```
 
 Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar, kiritish sehrgarining
-har bir qadami, podotchyot hisob-kitobi, valyuta konvertatsiyasi, qoldiq nazorati,
-bekor qilish, va **eng asosiysi** — yanvarda to'langan xarajat fevral
-foyda-zararida chiqishi.
+har bir qadami, ikki va uch pog'onali kategoriyalar, podotchyot hisob-kitobi,
+valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, va **eng asosiysi** —
+yanvarda to'langan xarajat fevral foyda-zararida chiqishi.

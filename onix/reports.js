@@ -44,20 +44,25 @@ async function cashFlow(from, to, currency) {
 
   // Kirim/chiqim — bo'lim (1-daraja kategoriya) kesimida
   const groups = await db.all(`
-    SELECT s.flow,
-           g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji,
-           c.id AS cat_id,   c.name AS cat_name,   c.emoji AS cat_emoji,
+    SELECT n.flow,
+           COALESCE(gp.id, p.id)       AS group_id,
+           COALESCE(gp.name, p.name)   AS group_name,
+           COALESCE(gp.emoji, p.emoji) AS group_emoji,
+           CASE WHEN gp.id IS NOT NULL THEN p.id    ELSE n.id    END AS cat_id,
+           CASE WHEN gp.id IS NOT NULL THEN p.name  ELSE n.name  END AS cat_name,
+           CASE WHEN gp.id IS NOT NULL THEN p.emoji ELSE n.emoji END AS cat_emoji,
+           NULL::int AS sub_id, NULL::text AS sub_name,
            SUM(o.amount) AS total
     FROM onix_operations o
-    JOIN onix_categories s ON s.id = o.category_id      -- podkategoriya
-    JOIN onix_categories c ON c.id = s.parent_id        -- kategoriya
-    JOIN onix_categories g ON g.id = c.parent_id        -- guruh
+    JOIN onix_categories n       ON n.id = o.category_id   -- barg: kategoriya yoki podkategoriya
+    LEFT JOIN onix_categories p  ON p.id = n.parent_id
+    LEFT JOIN onix_categories gp ON gp.id = p.parent_id
     WHERE o.deleted_at IS NULL
       AND o.type IN ('income','expense')
       AND o.currency = $3
       AND o.paid_at BETWEEN $1 AND $2
-    GROUP BY s.flow, g.id, g.name, g.emoji, c.id, c.name, c.emoji
-    ORDER BY s.flow DESC, SUM(o.amount) DESC`, [from, to, currency]);
+    GROUP BY n.flow, gp.id, gp.name, gp.emoji, p.id, p.name, p.emoji, n.id, n.name, n.emoji
+    ORDER BY n.flow DESC, SUM(o.amount) DESC`, [from, to, currency]);
 
   // Valyuta konvertatsiyasi — shu valyuta uchun sof kirim/chiqim
   const conv = await db.one(`
@@ -87,21 +92,26 @@ async function cashFlow(from, to, currency) {
 // ---------- FOYDA-ZARAR ----------
 async function profitLoss(period, currency) {
   const rows = await db.all(`
-    SELECT s.flow,
-           g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji,
-           c.id AS cat_id,   c.name AS cat_name,   c.emoji AS cat_emoji,
-           s.id AS sub_id,   s.name AS sub_name,
+    SELECT n.flow,
+           COALESCE(gp.id, p.id)       AS group_id,
+           COALESCE(gp.name, p.name)   AS group_name,
+           COALESCE(gp.emoji, p.emoji) AS group_emoji,
+           CASE WHEN gp.id IS NOT NULL THEN p.id    ELSE n.id    END AS cat_id,
+           CASE WHEN gp.id IS NOT NULL THEN p.name  ELSE n.name  END AS cat_name,
+           CASE WHEN gp.id IS NOT NULL THEN p.emoji ELSE n.emoji END AS cat_emoji,
+           CASE WHEN gp.id IS NOT NULL THEN n.id   END AS sub_id,
+           CASE WHEN gp.id IS NOT NULL THEN n.name END AS sub_name,
            SUM(o.amount) AS total
     FROM onix_operations o
-    JOIN onix_categories s ON s.id = o.category_id      -- podkategoriya
-    JOIN onix_categories c ON c.id = s.parent_id        -- kategoriya
-    JOIN onix_categories g ON g.id = c.parent_id        -- guruh
+    JOIN onix_categories n       ON n.id = o.category_id   -- barg: kategoriya yoki podkategoriya
+    LEFT JOIN onix_categories p  ON p.id = n.parent_id
+    LEFT JOIN onix_categories gp ON gp.id = p.parent_id
     WHERE o.deleted_at IS NULL
       AND o.type IN ('income','expense')
       AND o.currency = $2
       AND o.period = $1
-    GROUP BY s.flow, g.id, g.name, g.emoji, c.id, c.name, c.emoji, s.id, s.name
-    ORDER BY s.flow DESC, SUM(o.amount) DESC`, [period, currency]);
+    GROUP BY n.flow, gp.id, gp.name, gp.emoji, p.id, p.name, p.emoji, n.id, n.name, n.emoji
+    ORDER BY n.flow DESC, SUM(o.amount) DESC`, [period, currency]);
 
   const income  = nest(rows.filter(r => r.flow === 'income'),  3);
   const expense = nest(rows.filter(r => r.flow === 'expense'), 3);

@@ -50,6 +50,8 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   const savdo   = await mk(grIn,  2, "Ijara to'lovi",          'income');
   const naqdSav = await mk(savdo, 3, 'Mijoz A',                'income');
   const grEx    = await mk(null,  1, 'Onix xarajatlar uchun',  'expense');
+  const grFlat  = await mk(null,  1, 'Yangiobod',              'expense');
+  const catFlat = await mk(grFlat,2, 'Soliq',                  'expense');   // podkategoriyasiz
   const xomAsh  = await mk(grEx,  2, "Komunal to'lovlar",      'expense');
   const ozOvqat = await mk(xomAsh,3, 'Elektr energiya',        'expense');
 
@@ -151,6 +153,24 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   await cb('cancel', 101);
   eq((await db.countOperations({})).n, 3, 'bekor qilingan yozuv saqlanmadi');
 
+  // ═══ 6b. PODKATEGORIYASIZ KATEGORIYA — QADAM O'TKAZIB YUBORILADI ═══
+  console.log('\n─── Podkategoriyasiz kategoriya ───');
+  await msg(K.MENU.expense, 101);
+  await cb(`acc:${naqdSum}`, 101);
+  await cb(`grp:${grFlat}`, 101);
+  sent = []; await cb(`cat:${catFlat}`, 101);
+  ok(last().includes('Summani'), 'podkategoriya so\'ralmadi — to\'g\'ri summaga o\'tdi');
+  await msg('1,5 mln', 101);
+  await cb('dat:2026-03-09', 101);
+  await cb('per:2026-03-01', 101);
+  await cb('note:skip', 101);
+  await cb('save', 101);
+  const opFlat = await db.getOperation(4);
+  eq(opFlat.category_id, catFlat, 'kategoriyaning o\'ziga yozildi');
+  eq(opFlat.cat_name, 'Soliq', 'yo\'lda kategoriya nomi');
+  eq(opFlat.group_name, 'Yangiobod', 'yo\'lda guruh nomi');
+  eq(opFlat.category_name, 'null', 'podkategoriya bo\'sh');
+
   // ═══ 7. RAHBAR: HISOBOTLAR ═══
   console.log('\n─── Rahbar: hisobotlar ───');
   sent = []; await msg(K.MENU.pnl, 301);
@@ -163,8 +183,10 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   await cb('rcur:UZS', 301);
   await cb('rng:pick', 301);
   await cb('rrange:2026-03-01', 301);
-  ok(sent.some(s => s.text && s.text.includes('PUL OQIMI') && s.text.includes('37 000 000')),
-     'mart pul oqimi: 40−3 = 37 mln sof oqim');
+  ok(sent.some(s => s.text && s.text.includes('PUL OQIMI') && s.text.includes('35 500 000')),
+     'mart pul oqimi: 40 − 3 − 1,5 = 35,5 mln sof oqim');
+  ok(sent.some(s => s.text && s.text.includes('Yangiobod')),
+     'podkategoriyasiz guruh pul oqimida ko\'rindi');
 
   sent = []; await msg(K.MENU.podReport, 301);
   await cb('rcur:UZS', 301);
@@ -177,7 +199,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(last().includes('faqat') || last().includes('Faqat'), 'begona yozuvni bekor qila olmadi');
   sent = []; await msg('/del 3 xato kiritildi', 201);
   ok(last().includes('Bekor qilindi'), 'o\'z yozuvini bekor qildi');
-  eq((await db.countOperations({})).n, 2, 'bekor qilingan yozuv hisobdan chiqdi');
+  eq((await db.countOperations({})).n, 3, 'bekor qilingan yozuv hisobdan chiqdi');
   sent = []; await msg(K.MENU.myBalance, 201);
   ok(last().includes('5 000 000'), 'bekor qilingandan keyin qoldiq tiklandi');
 

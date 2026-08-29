@@ -148,14 +148,26 @@ CREATE INDEX IF NOT EXISTS onix_ops_period_idx  ON onix_operations (period)   WH
 CREATE INDEX IF NOT EXISTS onix_ops_account_idx ON onix_operations (account_id, to_account_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS onix_ops_author_idx  ON onix_operations (created_by, created_at);
 
--- Operatsiya faqat PODKATEGORIYAGA (3-daraja) yozilishi shart
+-- Operatsiya daraxtning ENG PASTKI tuguniga (bargiga) yoziladi.
+--   Uchinchi pog'ona bor bo'lsa — podkategoriyaga:  Onix › Xo'jalik › Salfetka
+--   Yo'q bo'lsa — kategoriyaning o'ziga:            Yangiobod › Soliq
+-- Guruhga (1-daraja) hech qachon yozilmaydi, va ostida bolasi bor
+-- tugunga ham yozilmaydi — aks holda jami ikki marta hisoblanardi.
 CREATE OR REPLACE FUNCTION onix_check_operation_category() RETURNS TRIGGER AS $fn$
-DECLARE lvl INT;
+DECLARE lvl INT; kids INT;
 BEGIN
   IF NEW.category_id IS NOT NULL THEN
     SELECT level INTO lvl FROM onix_categories WHERE id = NEW.category_id;
-    IF lvl IS DISTINCT FROM 3 THEN
-      RAISE EXCEPTION 'Operatsiya faqat podkategoriyaga (3-daraja) yoziladi, berilgani: % daraja', lvl;
+    IF lvl IS NULL THEN
+      RAISE EXCEPTION 'Kategoriya topilmadi: %', NEW.category_id;
+    END IF;
+    IF lvl = 1 THEN
+      RAISE EXCEPTION 'Operatsiya guruhga yozilmaydi — kategoriya yoki podkategoriya tanlang';
+    END IF;
+    SELECT count(*) INTO kids FROM onix_categories
+     WHERE parent_id = NEW.category_id AND active;
+    IF kids > 0 THEN
+      RAISE EXCEPTION 'Bu kategoriyada % ta podkategoriya bor — shulardan birini tanlang', kids;
     END IF;
   END IF;
   RETURN NEW;
