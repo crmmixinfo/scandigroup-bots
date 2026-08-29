@@ -43,10 +43,15 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
 
   const naqdSum = await accId('Naqd (sum)');
   const aliSum  = (await db.listAccounts({kind:'podotchet',ownerTgId:201,currency:'UZS'}))[0].id;
-  const savdo   = (await db.one("SELECT id FROM onix_categories WHERE name='Savdo tushumi'")).id;
-  const naqdSav = (await db.one("SELECT id FROM onix_categories WHERE name='Naqd savdo'")).id;
-  const xomAsh  = (await db.one("SELECT id FROM onix_categories WHERE name='Xom ashyo va mahsulot'")).id;
-  const ozOvqat = (await db.one("SELECT id FROM onix_categories WHERE name='Oziq-ovqat'")).id;
+  // Kategoriya daraxti: GURUH → KATEGORIYA → PODKATEGORIYA
+  await db.q('DELETE FROM onix_categories');
+  const mk = async (parent, level, name, flow) => (await db.addCategory(parent, level, name, flow, null)).id;
+  const grIn    = await mk(null,  1, 'Onix bussines center',   'income');
+  const savdo   = await mk(grIn,  2, "Ijara to'lovi",          'income');
+  const naqdSav = await mk(savdo, 3, 'Mijoz A',                'income');
+  const grEx    = await mk(null,  1, 'Onix xarajatlar uchun',  'expense');
+  const xomAsh  = await mk(grEx,  2, "Komunal to'lovlar",      'expense');
+  const ozOvqat = await mk(xomAsh,3, 'Elektr energiya',        'expense');
 
   // ═══ 1. RUXSATSIZ FOYDALANUVCHI ═══
   console.log('\n─── Ruxsat nazorati ───');
@@ -62,9 +67,11 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg(K.MENU.income, 101);
   ok(last().includes('qaysi kassaga'), 'hisob so\'raldi');
   await cb(`acc:${naqdSum}`, 101);
-  ok(last().includes('bo\'limini'), 'kategoriya bo\'limi so\'raldi');
+  ok(last().includes('Guruhni'), 'guruh so\'raldi');
+  await cb(`grp:${grIn}`, 101);
+  ok(last().includes('Kategoriyani'), 'kategoriya so\'raldi');
   await cb(`cat:${savdo}`, 101);
-  ok(last().includes('podkategoriya'), 'podkategoriya so\'raldi');
+  ok(last().includes('Podkategoriyani'), 'podkategoriya so\'raldi');
   await cb(`sub:${naqdSav}`, 101);
   ok(last().includes('Summani'), 'summa so\'raldi');
   sent = []; await msg('40 mln', 101);
@@ -103,6 +110,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg(K.MENU.myExpense, 201);
   ok(last().includes('Qaysi puldan'), 'hodimga o\'z hisobi ko\'rsatildi');
   await cb(`acc:${aliSum}`, 201);
+  await cb(`grp:${grEx}`, 201);
   await cb(`cat:${xomAsh}`, 201);
   await cb(`sub:${ozOvqat}`, 201);
   await msg('3 mln', 201);
@@ -122,6 +130,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   console.log('\n─── Qoldiqdan oshiq xarajat ───');
   await msg(K.MENU.myExpense, 201);
   await cb(`acc:${aliSum}`, 201);
+  await cb(`grp:${grEx}`, 201);
   await cb(`cat:${xomAsh}`, 201);
   await cb(`sub:${ozOvqat}`, 201);
   sent = []; await msg('99 mln', 201);
@@ -132,6 +141,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   console.log('\n─── Xato kiritish ───');
   await msg(K.MENU.income, 101);
   await cb(`acc:${naqdSum}`, 101);
+  await cb(`grp:${grIn}`, 101);
   await cb(`cat:${savdo}`, 101);
   await cb(`sub:${naqdSav}`, 101);
   sent = []; await msg('salom', 101);

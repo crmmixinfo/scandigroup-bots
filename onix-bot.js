@@ -81,8 +81,8 @@ bot.command('menu', (ctx) => {
 // ================= Operatsiya kiritish sehrgari =================
 
 const STEPS = {
-  income:    ['account', 'root', 'sub', 'amount', 'date', 'period', 'note', 'confirm'],
-  expense:   ['account', 'root', 'sub', 'amount', 'date', 'period', 'note', 'confirm'],
+  income:    ['account', 'group', 'cat', 'sub', 'amount', 'date', 'period', 'note', 'confirm'],
+  expense:   ['account', 'group', 'cat', 'sub', 'amount', 'date', 'period', 'note', 'confirm'],
   podotchet: ['account', 'staff', 'amount', 'date', 'note', 'confirm'],
   convert:   ['account', 'toaccount', 'amount', 'toamount', 'date', 'note', 'confirm'],
 };
@@ -143,17 +143,24 @@ async function ask(ctx) {
       return ctx.reply('📥 Qaysi hisobga tushadi?', K.accounts(rows, 'to', { showBalance: true }));
     }
 
-    case 'root': {
-      const flow = w.flow === 'income' ? 'income' : 'expense';
-      const rows = await db.listRootCategories(flow);
-      return ctx.reply('🗂 Kategoriya bo\'limini tanlang:', K.rootCategories(rows));
+    case 'group': {
+      const rows = await db.listGroups(w.flow === 'income' ? 'income' : 'expense');
+      if (!rows.length) return fail(ctx, "Guruhlar hali sozlanmagan. Administratorga murojaat qiling.");
+      return ctx.reply('🗂 <b>Guruhni</b> tanlang:', { ...HTML, ...K.groups(rows) });
+    }
+
+    case 'cat': {
+      const rows = await db.listChildren(d.groupId);
+      if (!rows.length) return fail(ctx, `«${d.groupName}» guruhida kategoriya yo'q.`);
+      return ctx.reply(`🗂 ${f.esc(d.groupName)}\n\n<b>Kategoriyani</b> tanlang:`,
+        { ...HTML, ...K.categories(rows) });
     }
 
     case 'sub': {
-      const rows = await db.listSubCategories(d.rootId);
-      if (!rows.length) return fail(ctx, "Bu bo'limda podkategoriya yo'q.");
-      return ctx.reply(`🗂 <b>${f.esc(d.rootName)}</b> — podkategoriyani tanlang:`,
-        { ...HTML, ...K.subCategories(rows, d.rootId) });
+      const rows = await db.listChildren(d.catId);
+      if (!rows.length) return fail(ctx, `«${d.catName}» kategoriyasida podkategoriya yo'q.`);
+      return ctx.reply(`🗂 ${f.esc(d.groupName)} · ${f.esc(d.catName)}\n\n<b>Podkategoriyani</b> tanlang:`,
+        { ...HTML, ...K.subCategories(rows) });
     }
 
     case 'amount':
@@ -192,7 +199,7 @@ function draftData(d, flow) {
     amount: d.amount, currency: d.currency,
     toAmount: d.toAmount, toCurrency: d.toCurrency,
     accountName: d.accountName, toAccountName: d.toAccountName,
-    rootName: d.rootName, categoryName: d.categoryName,
+    groupName: d.groupName, catName: d.catName, categoryName: d.categoryName,
     paidAt: d.paidAt, period: d.period, note: d.note,
   };
 }
@@ -231,14 +238,25 @@ bot.action(/^to:(\d+)$/, async (ctx) => {
   return advance(ctx);
 });
 
-// --- Kategoriya bo'limi ---
+// --- Guruh tanlandi (1-daraja) ---
+bot.action(/^grp:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  if (!at(ctx, 'group')) return;
+  const g = await db.getCategory(+ctx.match[1]);
+  if (!g) return;
+  Object.assign(wiz(ctx).d, { groupId: g.id, groupName: g.name, groupEmoji: g.emoji });
+  await ctx.editMessageText(`✅ Guruh: <b>${f.esc(g.emoji || '')} ${f.esc(g.name)}</b>`, HTML);
+  return advance(ctx);
+});
+
+// --- Kategoriya tanlandi (2-daraja) ---
 bot.action(/^cat:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
-  if (!at(ctx, 'root')) return;
-  const cat = await db.getCategory(+ctx.match[1]);
-  if (!cat) return;
-  Object.assign(wiz(ctx).d, { rootId: cat.id, rootName: cat.name, rootEmoji: cat.emoji });
-  await ctx.editMessageText(`✅ Bo'lim: <b>${f.esc(cat.emoji || '')} ${f.esc(cat.name)}</b>`, HTML);
+  if (!at(ctx, 'cat')) return;
+  const c = await db.getCategory(+ctx.match[1]);
+  if (!c) return;
+  Object.assign(wiz(ctx).d, { catId: c.id, catName: c.name, catEmoji: c.emoji });
+  await ctx.editMessageText(`✅ Kategoriya: <b>${f.esc(c.name)}</b>`, HTML);
   return advance(ctx);
 });
 
@@ -249,17 +267,20 @@ bot.action(/^sub:(\d+)$/, async (ctx) => {
   const cat = await db.getCategory(+ctx.match[1]);
   if (!cat) return;
   Object.assign(wiz(ctx).d, { categoryId: cat.id, categoryName: cat.name });
-  await ctx.editMessageText(`✅ Kategoriya: <b>${f.esc(cat.name)}</b>`, HTML);
+  await ctx.editMessageText(`✅ Podkategoriya: <b>${f.esc(cat.name)}</b>`, HTML);
   return advance(ctx);
 });
 
-bot.action('back:cat', async (ctx) => {
+// Bir pog'ona orqaga
+const back = (action, fromStep) => bot.action(action, async (ctx) => {
   await ctx.answerCbQuery();
-  if (!at(ctx, 'sub')) return;
+  if (!at(ctx, fromStep)) return;
   wiz(ctx).i -= 1;
   await ctx.deleteMessage().catch(() => {});
   return ask(ctx);
 });
+back('back:cat', 'sub');    // podkategoriyadan kategoriyaga
+back('back:grp', 'cat');    // kategoriyadan guruhga
 
 // --- To'lov sanasi ---
 bot.action(/^dat:(.+)$/, async (ctx) => {
@@ -619,10 +640,12 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<b>Hisoblar</b>\n` +
   `<code>/accounts</code> — ro'yxat\n` +
   `<code>/add_account &lt;cash|card|bank&gt; &lt;UZS|USD&gt; &lt;nom&gt;</code>\n\n` +
-  `<b>Kategoriyalar</b>\n` +
-  `<code>/cats</code> — ro'yxat\n` +
-  `<code>/add_cat &lt;bo'lim_id&gt; &lt;nom&gt;</code>\n` +
-  `<code>/del_cat &lt;id&gt;</code>\n\n` +
+  `<b>Kategoriyalar</b> — guruh › kategoriya › podkategoriya\n` +
+  `<code>/cats</code> — to'liq daraxt (ID lari bilan)\n` +
+  `<code>/add_group &lt;income|expense&gt; &lt;nom&gt;</code>\n` +
+  `<code>/add_cat &lt;guruh_id&gt; &lt;nom&gt;</code>\n` +
+  `<code>/add_sub &lt;kategoriya_id&gt; &lt;nom1, nom2&gt;</code>\n` +
+  `<code>/del_cat &lt;id&gt;</code> — istalgan darajani yashiradi\n\n` +
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
   `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>`, HTML));
@@ -683,30 +706,71 @@ bot.command('add_account', adminOnly(async (ctx) => {
 }));
 
 bot.command('cats', adminOnly(async (ctx) => {
-  const chunks = [];
   for (const flow of ['income', 'expense']) {
-    const roots = await db.listRootCategories(flow);
-    const parts = [`<b>${flow === 'income' ? '📥 DAROMAD' : '📤 XARAJAT'}</b>`];
-    for (const r of roots) {
-      const subs = await db.listSubCategories(r.id);
-      parts.push(`\n<code>${r.id}</code> ${r.emoji || ''} <b>${f.esc(r.name)}</b>\n` +
-        subs.map(s => `   <code>${s.id}</code> ${f.esc(s.name)}`).join('\n'));
+    const rows = await db.categoryTree(flow);
+    const parts = [`<b>${flow === 'income' ? '📥 KIRIM' : '📤 CHIQIM'}</b>`];
+    let group = null, cat = null;
+    for (const r of rows) {
+      if (r.group_id !== group) {
+        group = r.group_id; cat = null;
+        parts.push(`\n<code>${r.group_id}</code> ${r.group_emoji || ''} <b>${f.esc(r.group_name)}</b>`);
+      }
+      if (r.cat_id && r.cat_id !== cat) {
+        cat = r.cat_id;
+        parts.push(`  <code>${r.cat_id}</code> ${f.esc(r.cat_name)}`);
+      }
+      if (r.sub_id) parts.push(`      <code>${r.sub_id}</code> ${f.esc(r.sub_name)}`);
     }
-    chunks.push(parts.join('\n'));
+    // Telegram xabari 4096 belgidan oshmasin
+    let buf = '';
+    for (const line of parts) {
+      if (buf.length + line.length > 3500) { await ctx.reply(buf, HTML); buf = ''; }
+      buf += line + '\n';
+    }
+    if (buf.trim()) await ctx.reply(buf, HTML);
   }
-  for (const c of chunks) await ctx.reply(c, HTML);
+}));
+
+bot.command('add_group', adminOnly(async (ctx) => {
+  const [flow, ...name] = args(ctx);
+  if (!['income', 'expense'].includes(flow) || !name.length) {
+    return ctx.reply("Foydalanish:\n<code>/add_group expense Onix xarajatlar uchun</code>\n" +
+      "<code>/add_group income Onix bussines center</code>", HTML);
+  }
+  const g = await db.addCategory(null, 1, name.join(' '), flow, null);
+  return ctx.reply(`✅ Guruh qo'shildi: <b>${f.esc(g.name)}</b>  <code>#${g.id}</code>\n\n` +
+    `Endi kategoriya qo'shing:\n<code>/add_cat ${g.id} Kategoriya nomi</code>`, HTML);
 }));
 
 bot.command('add_cat', adminOnly(async (ctx) => {
-  const [parentId, ...name] = args(ctx);
-  if (!parentId || !name.length) {
-    return ctx.reply("Foydalanish:\n<code>/add_cat 40 Yangi podkategoriya</code>\n\n" +
-      "<i>40 — bo'lim ID si (/cats dan oling)</i>", HTML);
+  const [groupId, ...name] = args(ctx);
+  if (!groupId || !name.length) {
+    return ctx.reply("Foydalanish:\n<code>/add_cat 10 Kommunal to'lovlar</code>\n\n" +
+      "<i>10 — guruh ID si (/cats dan oling)</i>", HTML);
   }
-  const parent = await db.getCategory(parseInt(parentId, 10));
-  if (!parent || parent.parent_id) return ctx.reply("❌ Bunday bo'lim yo'q (1-daraja ID kerak).");
-  const c = await db.addCategory(parent.id, name.join(' '), parent.flow, null);
-  return ctx.reply(`✅ Qo'shildi: <b>${f.esc(parent.name)}</b> · ${f.esc(c.name)}  <code>#${c.id}</code>`, HTML);
+  const g = await db.getCategory(parseInt(groupId, 10));
+  if (!g || g.level !== 1) return ctx.reply("❌ Bunday guruh yo'q. /cats bilan ID ni tekshiring.");
+  const c = await db.addCategory(g.id, 2, name.join(' '), g.flow, null);
+  return ctx.reply(`✅ ${f.esc(g.name)} › <b>${f.esc(c.name)}</b>  <code>#${c.id}</code>\n\n` +
+    `Endi podkategoriya qo'shing:\n<code>/add_sub ${c.id} Podkategoriya nomi</code>`, HTML);
+}));
+
+bot.command('add_sub', adminOnly(async (ctx) => {
+  const [catId, ...name] = args(ctx);
+  if (!catId || !name.length) {
+    return ctx.reply("Foydalanish:\n<code>/add_sub 25 Elektr energiya</code>\n\n" +
+      "<i>Vergul bilan bir nechta:</i>\n<code>/add_sub 25 Elektr, Suv, Gaz</code>", HTML);
+  }
+  const c = await db.getCategory(parseInt(catId, 10));
+  if (!c || c.level !== 2) return ctx.reply("❌ Bunday kategoriya yo'q. /cats bilan ID ni tekshiring.");
+
+  // Vergul bilan ajratilgan ro'yxatni bir yo'la qo'shamiz
+  const names = name.join(' ').split(',').map(x => x.trim()).filter(Boolean);
+  const added = [];
+  for (const n of names) added.push(await db.addCategory(c.id, 3, n, c.flow, null));
+  return ctx.reply(
+    `✅ ${f.esc(c.name)} ostiga ${added.length} ta qo'shildi:\n` +
+    added.map(a => `   <code>${a.id}</code> ${f.esc(a.name)}`).join('\n'), HTML);
 }));
 
 bot.command('del_cat', adminOnly(async (ctx) => {

@@ -80,23 +80,47 @@ function balances({ kind, currency, ownerTgId } = {}) {
 
 // ================= Kategoriyalar =================
 
-const listRootCategories = (flow) =>
-  all('SELECT * FROM onix_categories WHERE parent_id IS NULL AND flow = $1 AND active = true ORDER BY sort_order, id', [flow]);
+// Daraxt: 1 — guruh, 2 — kategoriya, 3 — podkategoriya
 
-const listSubCategories = (parentId) =>
+const listGroups = (flow) =>
+  all('SELECT * FROM onix_categories WHERE level = 1 AND flow = $1 AND active = true ORDER BY sort_order, id', [flow]);
+
+const listChildren = (parentId) =>
   all('SELECT * FROM onix_categories WHERE parent_id = $1 AND active = true ORDER BY sort_order, id', [parentId]);
 
+// Podkategoriya + uning kategoriyasi va guruhi
 const getCategory = (id) =>
-  one(`SELECT c.*, p.name AS parent_name, p.emoji AS parent_emoji
-       FROM onix_categories c LEFT JOIN onix_categories p ON p.id = c.parent_id
+  one(`SELECT c.*,
+              p.id AS cat_id,   p.name AS cat_name,   p.emoji AS cat_emoji,
+              g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji
+       FROM onix_categories c
+       LEFT JOIN onix_categories p ON p.id = c.parent_id
+       LEFT JOIN onix_categories g ON g.id = p.parent_id
        WHERE c.id = $1`, [id]);
 
-const addCategory = (parentId, name, flow, emoji) =>
-  one(`INSERT INTO onix_categories (parent_id, name, flow, emoji) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [parentId, name, flow, emoji]);
+const addCategory = (parentId, level, name, flow, emoji) =>
+  one(`INSERT INTO onix_categories (parent_id, level, name, flow, emoji) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [parentId, level, name, flow, emoji]);
 
+// Guruhni o'chirsa — ostidagi kategoriya va podkategoriyalar ham yashiriladi
 const deactivateCategory = (id) =>
-  q('UPDATE onix_categories SET active = false WHERE id = $1 OR parent_id = $1', [id]);
+  q(`WITH RECURSIVE tree AS (
+       SELECT id FROM onix_categories WHERE id = $1
+       UNION ALL
+       SELECT c.id FROM onix_categories c JOIN tree t ON c.parent_id = t.id
+     )
+     UPDATE onix_categories SET active = false WHERE id IN (SELECT id FROM tree)`, [id]);
+
+// To'liq daraxt — /cats va tekshiruvlar uchun
+const categoryTree = (flow) =>
+  all(`SELECT g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji,
+              c.id AS cat_id,   c.name AS cat_name,   c.emoji AS cat_emoji,
+              s.id AS sub_id,   s.name AS sub_name
+       FROM onix_categories g
+       LEFT JOIN onix_categories c ON c.parent_id = g.id AND c.active
+       LEFT JOIN onix_categories s ON s.parent_id = c.id AND s.active
+       WHERE g.level = 1 AND g.flow = $1 AND g.active
+       ORDER BY g.sort_order, g.id, c.sort_order, c.id, s.sort_order, s.id`, [flow]);
 
 // ================= Operatsiyalar =================
 
@@ -116,13 +140,16 @@ const getOperation = (id) =>
   one(`SELECT o.*,
               a.name AS account_name,  a.emoji AS account_emoji,
               t.name AS to_account_name,
-              c.name AS category_name, p.name AS parent_name, p.emoji AS parent_emoji,
+              c.name AS category_name,
+              p.name AS cat_name,   p.emoji AS cat_emoji,
+              g.name AS group_name, g.emoji AS group_emoji,
               u.full_name AS author_name
        FROM onix_operations o
        JOIN onix_accounts a  ON a.id = o.account_id
        LEFT JOIN onix_accounts t ON t.id = o.to_account_id
        LEFT JOIN onix_categories c ON c.id = o.category_id
        LEFT JOIN onix_categories p ON p.id = c.parent_id
+       LEFT JOIN onix_categories g ON g.id = p.parent_id
        LEFT JOIN onix_users u ON u.tg_id = o.created_by
        WHERE o.id = $1`, [id]);
 
@@ -144,13 +171,16 @@ function listOperations({ from, to, createdBy, accountId, limit = 30, offset = 0
     SELECT o.*,
            a.name AS account_name, a.emoji AS account_emoji,
            t.name AS to_account_name,
-           c.name AS category_name, p.name AS parent_name, p.emoji AS parent_emoji,
+           c.name AS category_name,
+           p.name AS cat_name,   p.emoji AS cat_emoji,
+           g.name AS group_name, g.emoji AS group_emoji,
            u.full_name AS author_name
     FROM onix_operations o
     JOIN onix_accounts a  ON a.id = o.account_id
     LEFT JOIN onix_accounts t ON t.id = o.to_account_id
     LEFT JOIN onix_categories c ON c.id = o.category_id
     LEFT JOIN onix_categories p ON p.id = c.parent_id
+    LEFT JOIN onix_categories g ON g.id = p.parent_id
     LEFT JOIN onix_users u ON u.tg_id = o.created_by
     WHERE ${where.join(' AND ')}
     ORDER BY o.paid_at DESC, o.id DESC
@@ -171,6 +201,6 @@ module.exports = {
   pool, q, one, all, SUPER_ADMIN_ID,
   getUser, listUsers, addUser, deactivateUser, ensurePodotchet,
   listAccounts, getAccount, balances,
-  listRootCategories, listSubCategories, getCategory, addCategory, deactivateCategory,
+  listGroups, listChildren, getCategory, addCategory, deactivateCategory, categoryTree,
   addOperation, getOperation, softDelete, listOperations, countOperations,
 };

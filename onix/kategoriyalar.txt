@@ -1,0 +1,20 @@
+# ONIX — kategoriyalar daraxti
+#
+# Ko'rinishi:   GURUH > KATEGORIYA > podkategoriya1, podkategoriya2, ...
+# Yuklash:      npm run onix:categories
+# Tekshirish:   npm run onix:categories -- --dry     (bazaga yozmaydi)
+#
+# Qayta yuklash xavfsiz — mavjud yozuvlar takrorlanmaydi, faqat yangilari qo'shiladi.
+# Qator o'chirilsa baza'dan o'chmaydi; yashirish uchun botda /del_cat <id>.
+
+KIRIM
+
+Onix bussines center > Ijara to'lovi > mijoz nomi
+Ta'sischidan > Humoyun aka > Kirim
+
+
+CHIQIM
+
+Onix xarajatlar uchun > Asosiy vositalar > Ta'mirlash, Asosiy vositalar, Usta haqqi
+Onix xarajatlar uchun > Komunal to'lovlar > Elektr energiya, Suv, Gaz, Chiqindi, Internet
+Onix xarajatlar uchun > Oylik > Xodimlar maoshi

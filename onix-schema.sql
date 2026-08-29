@@ -48,10 +48,17 @@ CREATE TABLE IF NOT EXISTS onix_accounts (
 CREATE UNIQUE INDEX IF NOT EXISTS onix_accounts_podotchet_uniq
   ON onix_accounts (owner_tg_id, currency) WHERE kind = 'podotchet';
 
--- ---------- Kategoriyalar (2 pog'onali daraxt) ----------
+-- ---------- Kategoriyalar (3 pog'onali daraxt) ----------
+--   level 1 — GURUH          (parent_id = NULL)   masalan: "Doimiy xarajat"
+--   level 2 — KATEGORIYA     (ota: guruh)         masalan: "Ijara va kommunal"
+--   level 3 — PODKATEGORIYA  (ota: kategoriya)    masalan: "Elektr energiya"
+--
+-- Operatsiya HAR DOIM 3-darajaga (podkategoriyaga) yoziladi.
+-- Hisobotlar guruh → kategoriya → podkategoriya kesimida yig'iladi.
 CREATE TABLE IF NOT EXISTS onix_categories (
   id         SERIAL PRIMARY KEY,
   parent_id  INT REFERENCES onix_categories(id) ON DELETE CASCADE,
+  level      INT NOT NULL DEFAULT 1 CHECK (level BETWEEN 1 AND 3),
   name       TEXT NOT NULL,
   flow       TEXT NOT NULL CHECK (flow IN ('income','expense')),
   emoji      TEXT,
@@ -59,7 +66,39 @@ CREATE TABLE IF NOT EXISTS onix_categories (
   sort_order INT DEFAULT 100
 );
 
+-- Avvalgi 2 pog'onali bazadan yangilanish (bir marta ishlaydi)
+ALTER TABLE onix_categories ADD COLUMN IF NOT EXISTS level INT NOT NULL DEFAULT 1;
+
 CREATE INDEX IF NOT EXISTS onix_categories_parent_idx ON onix_categories (parent_id);
+CREATE INDEX IF NOT EXISTS onix_categories_level_idx  ON onix_categories (level, flow) WHERE active;
+
+-- Daraja va ota-bola bog'lanishini bazaning o'zi tekshiradi
+CREATE OR REPLACE FUNCTION onix_check_category_level() RETURNS TRIGGER AS $fn$
+DECLARE parent_level INT; parent_flow TEXT;
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    IF NEW.level <> 1 THEN
+      RAISE EXCEPTION 'Otasi yo''q kategoriya faqat 1-daraja (guruh) bo''lishi mumkin';
+    END IF;
+  ELSE
+    SELECT level, flow INTO parent_level, parent_flow FROM onix_categories WHERE id = NEW.parent_id;
+    IF parent_level IS NULL THEN
+      RAISE EXCEPTION 'Ota kategoriya topilmadi: %', NEW.parent_id;
+    END IF;
+    IF NEW.level <> parent_level + 1 THEN
+      RAISE EXCEPTION 'Daraja xato: ota % darajada, bola % darajada bo''lmaydi', parent_level, NEW.level;
+    END IF;
+    IF NEW.flow <> parent_flow THEN
+      RAISE EXCEPTION 'Bola otasi bilan bir xil oqimda (income/expense) bo''lishi kerak';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $fn$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS onix_categories_level_trg ON onix_categories;
+CREATE TRIGGER onix_categories_level_trg
+  BEFORE INSERT OR UPDATE ON onix_categories
+  FOR EACH ROW EXECUTE FUNCTION onix_check_category_level();
 
 -- ---------- Kassa daftari (barcha operatsiyalar) ----------
 CREATE TABLE IF NOT EXISTS onix_operations (
@@ -109,6 +148,24 @@ CREATE INDEX IF NOT EXISTS onix_ops_period_idx  ON onix_operations (period)   WH
 CREATE INDEX IF NOT EXISTS onix_ops_account_idx ON onix_operations (account_id, to_account_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS onix_ops_author_idx  ON onix_operations (created_by, created_at);
 
+-- Operatsiya faqat PODKATEGORIYAGA (3-daraja) yozilishi shart
+CREATE OR REPLACE FUNCTION onix_check_operation_category() RETURNS TRIGGER AS $fn$
+DECLARE lvl INT;
+BEGIN
+  IF NEW.category_id IS NOT NULL THEN
+    SELECT level INTO lvl FROM onix_categories WHERE id = NEW.category_id;
+    IF lvl IS DISTINCT FROM 3 THEN
+      RAISE EXCEPTION 'Operatsiya faqat podkategoriyaga (3-daraja) yoziladi, berilgani: % daraja', lvl;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $fn$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS onix_operations_category_trg ON onix_operations;
+CREATE TRIGGER onix_operations_category_trg
+  BEFORE INSERT OR UPDATE ON onix_operations
+  FOR EACH ROW EXECUTE FUNCTION onix_check_operation_category();
+
 -- ---------- Qoldiqlar (hisoblanadigan ko'rinish) ----------
 CREATE OR REPLACE VIEW onix_balances AS
 SELECT
@@ -144,60 +201,7 @@ WHERE NOT EXISTS (
 );
 
 -- ---------- Kategoriyalar ----------
--- 1-daraja: bo'lim, 2-daraja: podkategoriya. Operatsiya faqat 2-darajaga yoziladi.
-DO $seed$
-DECLARE
-  tree JSONB := $json$[
-    {"flow":"income","emoji":"🛒","name":"Savdo tushumi",
-     "kids":["Naqd savdo","Terminal (plastik)","Onlayn to'lov (Click/Payme)","Yetkazib berish","Korporativ buyurtma"]},
-    {"flow":"income","emoji":"➕","name":"Boshqa daromad",
-     "kids":["Ijaraga berishdan","Bank foizi","Kurs farqi (foyda)","Yetkazib beruvchi bonusi","Boshqa kirim"]},
-    {"flow":"income","emoji":"🏦","name":"Moliyaviy kirim",
-     "kids":["Ta'sischi qo'shimcha kiritmasi","Olingan qarz","Qaytgan qarz"]},
-
-    {"flow":"expense","emoji":"📦","name":"Xom ashyo va mahsulot",
-     "kids":["Oziq-ovqat","Ichimlik","Bir martalik idish","Qadoqlash materiallari","Sarf materiallar"]},
-    {"flow":"expense","emoji":"👥","name":"Ish haqi",
-     "kids":["Oylik","Avans","Bonus / KPI","Ish haqi soliqlari","Vaqtinchalik ishchi"]},
-    {"flow":"expense","emoji":"🏠","name":"Ijara va kommunal",
-     "kids":["Ijara haqi","Elektr energiya","Gaz","Suv","Internet va aloqa","Chiqindi olib ketish"]},
-    {"flow":"expense","emoji":"📣","name":"Marketing",
-     "kids":["SMM va reklama","Blogerlar","Bosma mahsulot","Aksiya va chegirma","Fotograf / kontent"]},
-    {"flow":"expense","emoji":"🔧","name":"Operatsion xarajat",
-     "kids":["Transport va yoqilg'i","Ta'mirlash","Jihoz va inventar","Tozalash vositalari","Kanselyariya","Formal kiyim"]},
-    {"flow":"expense","emoji":"📋","name":"Boshqaruv xarajati",
-     "kids":["Bank xizmati","Buxgalteriya / audit","Yuridik xizmat","Litsenziya va ruxsatnoma","Dasturiy ta'minot / obuna","Aloqa (korporativ)"]},
-    {"flow":"expense","emoji":"🧾","name":"Soliqlar",
-     "kids":["QQS","Aylanma solig'i","Foyda solig'i","Mol-mulk solig'i","Boshqa soliq va yig'im"]},
-    {"flow":"expense","emoji":"➖","name":"Boshqa xarajat",
-     "kids":["Kutilmagan xarajat","Jarima va penya","Kurs farqi (zarar)","Xayriya","Mehmondo'stlik"]},
-    {"flow":"expense","emoji":"🏦","name":"Moliyaviy chiqim",
-     "kids":["Berilgan qarz","Qarz qaytarish","Kredit foizi","Ta'sischiga dividend"]}
-  ]$json$::jsonb;
-  item   JSONB;
-  child  TEXT;
-  pid    INT;
-  i      INT := 0;
-  j      INT;
-BEGIN
-  FOR item IN SELECT * FROM jsonb_array_elements(tree) LOOP
-    i := i + 10;
-
-    SELECT id INTO pid FROM onix_categories
-     WHERE parent_id IS NULL AND name = item->>'name' AND flow = item->>'flow' LIMIT 1;
-
-    IF pid IS NULL THEN
-      INSERT INTO onix_categories (parent_id, name, flow, emoji, sort_order)
-      VALUES (NULL, item->>'name', item->>'flow', item->>'emoji', i)
-      RETURNING id INTO pid;
-    END IF;
-
-    j := 0;
-    FOR child IN SELECT jsonb_array_elements_text(item->'kids') LOOP
-      j := j + 10;
-      INSERT INTO onix_categories (parent_id, name, flow, emoji, sort_order)
-      SELECT pid, child, item->>'flow', NULL, j
-      WHERE NOT EXISTS (SELECT 1 FROM onix_categories WHERE parent_id = pid AND name = child);
-    END LOOP;
-  END LOOP;
-END $seed$;
+-- Kategoriyalar sxemada emas, `onix/kategoriyalar.txt` faylida turadi.
+-- Yuklash:  npm run onix:categories
+-- Sabab: ro'yxatni tahrirlash uchun SQL bilmaslik kerak emas, va u
+-- bitta joyda turadi — bazada ham, faylda ham nusxasi bo'lmaydi.

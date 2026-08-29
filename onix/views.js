@@ -29,14 +29,20 @@ function cashFlow(cf) {
 
   L.push('📥 KIRIM');
   if (!cf.income.length) L.push('   —');
-  for (const g of cf.income) L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c, { indent: 1 }));
+  for (const g of cf.income) {
+    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c));
+    for (const k of g.cats) L.push(row(`· ${k.name}`, k.total, c, { indent: 3 }));
+  }
   L.push(LINE);
   L.push(row('Jami kirim', f.signed(cf.incomeTotal, c), c));
   L.push('');
 
   L.push('📤 CHIQIM');
   if (!cf.expense.length) L.push('   —');
-  for (const g of cf.expense) L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c, { indent: 1 }));
+  for (const g of cf.expense) {
+    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c));
+    for (const k of g.cats) L.push(row(`· ${k.name}`, k.total, c, { indent: 3 }));
+  }
   L.push(LINE);
   L.push(row('Jami chiqim', f.signed(-cf.expenseTotal, c), c));
 
@@ -75,20 +81,14 @@ function profitLoss(pl, prev) {
 
   L.push('📥 DAROMAD');
   if (!pl.income.length) L.push('   —');
-  for (const g of pl.income) {
-    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c, { indent: 1 }));
-    for (const s of g.subs) L.push(row(`· ${s.name}`, s.total, c, { indent: 4 }));
-  }
+  for (const g of pl.income) tree(L, g, c);
   L.push(LINE);
   L.push(row('Jami daromad', pl.revenue, c));
   L.push('');
 
   L.push('📤 XARAJAT');
   if (!pl.expense.length) L.push('   —');
-  for (const g of pl.expense) {
-    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c, { indent: 1 }));
-    for (const s of g.subs) L.push(row(`· ${s.name}`, s.total, c, { indent: 4 }));
-  }
+  for (const g of pl.expense) tree(L, g, c);
   L.push(LINE);
   L.push(row('Jami xarajat', pl.costs, c));
 
@@ -111,6 +111,16 @@ function profitLoss(pl, prev) {
          `📅 ${f.periodLabel(pl.period)} · ${curLabel(c)}  ${icon}\n` +
          `<i>xarajat tegishli bo'lgan davr bo'yicha</i>\n\n` +
          `<pre>${f.esc(L.join('\n'))}</pre>`;
+}
+
+// Guruh → kategoriya → podkategoriya uch pog'onasini chizadi
+function tree(L, group, currency) {
+  L.push(row(`${group.emoji || '•'} ${group.name}`, group.total, currency));
+  for (const cat of group.cats) {
+    L.push(row(`${cat.emoji ? cat.emoji + ' ' : ''}${cat.name}`, cat.total, currency, { indent: 2 }));
+    for (const sub of cat.subs) L.push(row(`· ${sub.name}`, sub.total, currency, { indent: 5 }));
+  }
+  L.push('');
 }
 
 function delta(now, before) {
@@ -166,7 +176,7 @@ function operationLine(o) {
   const icon = TYPE_ICON[o.type];
   const what = o.type === 'transfer'
     ? `${o.account_name} → ${o.to_account_name}`
-    : `${o.parent_name ? o.parent_name + ' · ' : ''}${o.category_name}`;
+    : [o.group_name, o.cat_name, o.category_name].filter(Boolean).join(' · ');
   const amount = o.type === 'expense' ? -Number(o.amount) : Number(o.amount);
 
   let line = `${icon} <b>${f.money(amount, o.currency)}</b> — ${f.esc(what)}\n` +
@@ -198,9 +208,10 @@ function draft(d) {
     L.push(row('Qayerga',  d.toAccountName, d.currency));
     if (d.toAmount) L.push(row('Olinadi', f.money(d.toAmount, d.toCurrency), d.currency));
   } else {
-    L.push(row('Hisob',      d.accountName, d.currency));
-    L.push(row('Kategoriya', d.rootName, d.currency));
-    L.push(row('',           d.categoryName, d.currency, { indent: 2 }));
+    L.push(row('Hisob',        d.accountName, d.currency));
+    L.push(row('Guruh',        d.groupName, d.currency));
+    L.push(row('Kategoriya',   d.catName, d.currency));
+    L.push(row('Podkategoriya', d.categoryName, d.currency));
   }
   L.push(row("To'lov sanasi", f.d(d.paidAt), d.currency));
   L.push(row('P&L davri',     f.periodLabel(d.period), d.currency));

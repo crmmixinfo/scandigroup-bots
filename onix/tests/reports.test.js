@@ -12,13 +12,29 @@ const eq = (got, want, label) => {
   ok ? pass++ : fail++;
 };
 
-const catId = async (name) => (await db.one('SELECT id FROM onix_categories WHERE name=$1 AND parent_id IS NOT NULL', [name])).id;
+const catId = async (name) => (await db.one('SELECT id FROM onix_categories WHERE name=$1 AND level=3', [name])).id;
+
+// Testlar o'z kategoriya daraxtini quradi — urug' mazmuniga bog'liq emas
+async function seedTree() {
+  const mk = async (parent, level, name, flow) =>
+    (await db.addCategory(parent, level, name, flow, null)).id;
+  const gi = await mk(null, 1, 'Test daromad guruhi', 'income');
+  const ci = await mk(gi, 2, 'Savdo tushumi', 'income');
+  await mk(ci, 3, 'Naqd savdo', 'income');
+  const ge = await mk(null, 1, 'Test xarajat guruhi', 'expense');
+  const c1 = await mk(ge, 2, 'Xom ashyo va mahsulot', 'expense');
+  await mk(c1, 3, 'Oziq-ovqat', 'expense');
+  const c2 = await mk(ge, 2, 'Ijara va kommunal', 'expense');
+  await mk(c2, 3, 'Ijara haqi', 'expense');
+}
 const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE name=$1', [name])).id;
 
 (async () => {
   await db.q('TRUNCATE onix_operations RESTART IDENTITY CASCADE');
   await db.q("DELETE FROM onix_accounts WHERE kind='podotchet'");
   await db.q('DELETE FROM onix_users');
+  await db.q('DELETE FROM onix_categories');
+  await seedTree();
 
   await db.addUser(101, 'Rustam Kassir', 'cashier', 1);
   await db.addUser(201, 'Ali Valiyev',   'staff',   1);

@@ -44,20 +44,20 @@ async function cashFlow(from, to, currency) {
 
   // Kirim/chiqim — bo'lim (1-daraja kategoriya) kesimida
   const groups = await db.all(`
-    SELECT c.flow,
-           p.id    AS root_id,
-           p.name  AS root_name,
-           p.emoji AS root_emoji,
+    SELECT s.flow,
+           g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji,
+           c.id AS cat_id,   c.name AS cat_name,   c.emoji AS cat_emoji,
            SUM(o.amount) AS total
     FROM onix_operations o
-    JOIN onix_categories c ON c.id = o.category_id
-    JOIN onix_categories p ON p.id = COALESCE(c.parent_id, c.id)
+    JOIN onix_categories s ON s.id = o.category_id      -- podkategoriya
+    JOIN onix_categories c ON c.id = s.parent_id        -- kategoriya
+    JOIN onix_categories g ON g.id = c.parent_id        -- guruh
     WHERE o.deleted_at IS NULL
       AND o.type IN ('income','expense')
       AND o.currency = $3
       AND o.paid_at BETWEEN $1 AND $2
-    GROUP BY c.flow, p.id, p.name, p.emoji
-    ORDER BY c.flow DESC, SUM(o.amount) DESC`, [from, to, currency]);
+    GROUP BY s.flow, g.id, g.name, g.emoji, c.id, c.name, c.emoji
+    ORDER BY s.flow DESC, SUM(o.amount) DESC`, [from, to, currency]);
 
   // Valyuta konvertatsiyasi — shu valyuta uchun sof kirim/chiqim
   const conv = await db.one(`
@@ -66,8 +66,8 @@ async function cashFlow(from, to, currency) {
     FROM (${MOVES} AND o.paid_at BETWEEN $1 AND $2) m
     WHERE currency = $3 AND is_conversion`, [from, to, currency]);
 
-  const income  = groups.filter(g => g.flow === 'income').map(toGroup);
-  const expense = groups.filter(g => g.flow === 'expense').map(toGroup);
+  const income  = nest(groups.filter(g => g.flow === 'income'),  2);
+  const expense = nest(groups.filter(g => g.flow === 'expense'), 2);
 
   const incomeTotal  = sum(income);
   const expenseTotal = sum(expense);
@@ -87,25 +87,24 @@ async function cashFlow(from, to, currency) {
 // ---------- FOYDA-ZARAR ----------
 async function profitLoss(period, currency) {
   const rows = await db.all(`
-    SELECT c.flow,
-           p.id    AS root_id,
-           p.name  AS root_name,
-           p.emoji AS root_emoji,
-           c.id    AS sub_id,
-           c.name  AS sub_name,
+    SELECT s.flow,
+           g.id AS group_id, g.name AS group_name, g.emoji AS group_emoji,
+           c.id AS cat_id,   c.name AS cat_name,   c.emoji AS cat_emoji,
+           s.id AS sub_id,   s.name AS sub_name,
            SUM(o.amount) AS total
     FROM onix_operations o
-    JOIN onix_categories c ON c.id = o.category_id
-    JOIN onix_categories p ON p.id = COALESCE(c.parent_id, c.id)
+    JOIN onix_categories s ON s.id = o.category_id      -- podkategoriya
+    JOIN onix_categories c ON c.id = s.parent_id        -- kategoriya
+    JOIN onix_categories g ON g.id = c.parent_id        -- guruh
     WHERE o.deleted_at IS NULL
       AND o.type IN ('income','expense')
       AND o.currency = $2
       AND o.period = $1
-    GROUP BY c.flow, p.id, p.name, p.emoji, c.id, c.name
-    ORDER BY c.flow DESC, SUM(o.amount) DESC`, [period, currency]);
+    GROUP BY s.flow, g.id, g.name, g.emoji, c.id, c.name, c.emoji, s.id, s.name
+    ORDER BY s.flow DESC, SUM(o.amount) DESC`, [period, currency]);
 
-  const income  = nest(rows.filter(r => r.flow === 'income'));
-  const expense = nest(rows.filter(r => r.flow === 'expense'));
+  const income  = nest(rows.filter(r => r.flow === 'income'),  3);
+  const expense = nest(rows.filter(r => r.flow === 'expense'), 3);
 
   const revenue = sum(income);
   const costs   = sum(expense);
@@ -180,26 +179,39 @@ async function deferred(currency, afterPeriod) {
 
 // ================= yordamchilar =================
 
-const toGroup = (r) => ({
-  id: r.root_id, name: r.root_name, emoji: r.root_emoji, total: Number(r.total), subs: [],
-});
-
 const sum = (groups) => groups.reduce((acc, g) => acc + g.total, 0);
 
-// Tekis qatorlarni bo'lim → podkategoriya daraxtiga yig'ish
-function nest(rows) {
-  const map = new Map();
+// Tekis qatorlarni GURUH → KATEGORIYA → PODKATEGORIYA daraxtiga yig'adi.
+// depth = 2 — podkategoriyasiz (pul oqimi), depth = 3 — to'liq (foyda-zarar).
+function nest(rows, depth = 3) {
+  const groups = new Map();
+
   for (const r of rows) {
-    if (!map.has(r.root_id)) map.set(r.root_id, toGroup(r));
-    const g = map.get(r.root_id);
-    g.subs.push({ id: r.sub_id, name: r.sub_name, total: Number(r.total) });
+    if (!groups.has(r.group_id)) {
+      groups.set(r.group_id, {
+        id: r.group_id, name: r.group_name, emoji: r.group_emoji, total: 0, cats: new Map(),
+      });
+    }
+    const g = groups.get(r.group_id);
+
+    if (!g.cats.has(r.cat_id)) {
+      g.cats.set(r.cat_id, {
+        id: r.cat_id, name: r.cat_name, emoji: r.cat_emoji, total: 0, subs: [],
+      });
+    }
+    const c = g.cats.get(r.cat_id);
+
+    const amount = Number(r.total);
+    if (depth >= 3 && r.sub_id) c.subs.push({ id: r.sub_id, name: r.sub_name, total: amount });
+    c.total += amount;
+    g.total += amount;
   }
-  const groups = [...map.values()];
-  for (const g of groups) {
-    g.total = g.subs.reduce((a, s) => a + s.total, 0);
-    g.subs.sort((a, b) => b.total - a.total);
-  }
-  return groups.sort((a, b) => b.total - a.total);
+
+  const byTotal = (a, b) => b.total - a.total;
+  return [...groups.values()].map(g => ({
+    ...g,
+    cats: [...g.cats.values()].map(c => ({ ...c, subs: c.subs.sort(byTotal) })).sort(byTotal),
+  })).sort(byTotal);
 }
 
 function prevMonth(period) {

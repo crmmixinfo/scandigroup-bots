@@ -83,7 +83,63 @@ Yangi kassa qo'shish: `/add_account card USD Plastik Anor`
 
 ---
 
-## 6. Hisobotlar
+## 6. Kategoriyalar — uch pog'ona
+
+```
+GURUH  ›  KATEGORIYA  ›  PODKATEGORIYA
+```
+
+Masalan:
+
+```
+Onix xarajatlar uchun  ›  Komunal to'lovlar  ›  Elektr energiya
+Onix bussines center   ›  Ijara to'lovi      ›  mijoz nomi
+```
+
+Operatsiya **har doim podkategoriyaga** yoziladi — buni bazaning o'zi trigger bilan
+kafolatlaydi. Hisobotlar uchala pog'ona kesimida jamlanadi: guruh jami,
+kategoriya jami, podkategoriya tafsiloti.
+
+### Ro'yxatni tahrirlash
+
+Manba — `onix/kategoriyalar.txt`. Bitta qator = bitta kategoriya yo'li:
+
+```
+KIRIM
+
+Onix bussines center > Ijara to'lovi > Mijoz A, Mijoz B, Mijoz C
+Ta'sischidan > Humoyun aka > Kirim
+
+CHIQIM
+
+Onix xarajatlar uchun > Asosiy vositalar > Ta'mirlash, Asosiy vositalar, Usta haqqi
+Onix xarajatlar uchun > Komunal to'lovlar > Elektr energiya, Suv, Gaz, Chiqindi, Internet
+Onix xarajatlar uchun > Oylik > Xodimlar maoshi
+```
+
+```bash
+npm run onix:categories -- --dry   # avval tekshiring — bazaga yozmaydi
+npm run onix:categories            # yuklash
+```
+
+Qayta yuklash xavfsiz: mavjudlari takrorlanmaydi, faqat yangilari qo'shiladi.
+
+### Yoki to'g'ridan-to'g'ri Telegramdan
+
+```
+/cats                                    — daraxt, ID lari bilan
+/add_group expense Onix xarajatlar uchun
+/add_cat   87 Komunal to'lovlar
+/add_sub   92 Elektr energiya, Suv, Gaz  — vergul bilan bir yo'la
+/del_cat   92                            — istalgan darajani yashiradi
+```
+
+Kategoriya hech qachon o'chmaydi — `active = false` bo'ladi, shuning uchun
+eski operatsiyalar hisobotlarda joyida qoladi.
+
+---
+
+## 7. Hisobotlar
 
 **💹 Pul oqimi** (`paid_at` bo'yicha) — boshlang'ich qoldiq, kirim va chiqim
 bo'limlar kesimida, valyuta konvertatsiyasi, sof oqim, yakuniy qoldiq,
@@ -100,12 +156,13 @@ qatorda `→ P&L: Fev 2026` belgisi bilan.
 
 ---
 
-## 7. O'rnatish
+## 8. O'rnatish
 
 ```bash
 npm install
 cp .env.example .env          # ONIX_BOT_TOKEN, DATABASE_URL, SUPER_ADMIN_ID to'ldiring
 npm run onix:schema           # bazani tayyorlash (qayta ishga tushirsa ham xavfsiz)
+npm run onix:categories       # kategoriyalarni yuklash
 npm run onix                  # botni ishga tushirish
 ```
 
@@ -125,7 +182,7 @@ Har bir hodim o'z Telegram ID sini `/myid` orqali oladi.
 
 ---
 
-## 8. Sozlash buyruqlari (admin)
+## 9. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -134,9 +191,11 @@ Har bir hodim o'z Telegram ID sini `/myid` orqali oladi.
 | `/remove_user <id>` | O'chirish (yozuvlari daftarda qoladi) |
 | `/accounts` | Hisoblar va qoldiqlar |
 | `/add_account <cash\|card\|bank> <UZS\|USD> <nom>` | Yangi kassa |
-| `/cats` | Kategoriyalar (ID lari bilan) |
-| `/add_cat <bo'lim_id> <nom>` | Yangi podkategoriya |
-| `/del_cat <id>` | Kategoriyani yashirish |
+| `/cats` | Kategoriya daraxti (ID lari bilan) |
+| `/add_group <income\|expense> <nom>` | Yangi guruh |
+| `/add_cat <guruh_id> <nom>` | Yangi kategoriya |
+| `/add_sub <kategoriya_id> <nom1, nom2>` | Yangi podkategoriya(lar) |
+| `/del_cat <id>` | Istalgan darajani yashirish |
 | `/del <id> <sabab>` | Yozuvni bekor qilish |
 
 **Yozuvlar hech qachon o'chmaydi** — `deleted_at` bilan belgilanadi,
@@ -144,7 +203,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 9. Fayllar
+## 10. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -154,10 +213,12 @@ onix/reports.js      pul oqimi, foyda-zarar, podotchyot hisob-kitobi
 onix/views.js        hisobotlarni matn ko'rinishida chizish
 onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
-onix/tests/          testlar (55 ta tekshiruv)
+onix/tools/          kategoriyalarni matn faylidan yuklovchi
+onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
+onix/tests/          testlar (56 ta tekshiruv)
 ```
 
-## 10. Testlar
+## 11. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 

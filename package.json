@@ -6,7 +6,8 @@
     "hr": "node hr-bot.js",
     "onix": "node onix-bot.js",
     "onix:schema": "psql \"$DATABASE_URL\" -f onix-schema.sql",
-    "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js"
+    "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js",
+    "onix:categories": "node onix/tools/import-categories.js onix/kategoriyalar.txt"
   },
   "dependencies": {
     "telegraf": "^4.16.0",

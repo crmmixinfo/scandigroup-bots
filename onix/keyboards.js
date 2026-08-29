@@ -61,20 +61,23 @@ function accounts(rows, prefix = 'acc', { showBalance = false } = {}) {
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }
 
-// Kategoriya bo'limlari — 2 tadan
-function rootCategories(rows) {
-  const buttons = [];
-  for (let i = 0; i < rows.length; i += 2) {
-    buttons.push(rows.slice(i, i + 2).map(c =>
-      Markup.button.callback(`${c.emoji || '•'} ${c.name}`, `cat:${c.id}`)));
-  }
+// Guruhlar (1-daraja) — bittadan, nomlari uzun bo'lishi mumkin
+function groups(rows) {
+  const buttons = rows.map(g => [Markup.button.callback(`${g.emoji || '•'} ${g.name}`, `grp:${g.id}`)]);
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }
 
-// Podkategoriyalar — bittadan (nomlari uzun)
-function subCategories(rows, parentId) {
+// Kategoriyalar (2-daraja)
+function categories(rows) {
+  const buttons = rows.map(c => [Markup.button.callback(`${c.emoji || '•'} ${c.name}`, `cat:${c.id}`)]);
+  buttons.push([Markup.button.callback('⬅️ Guruhlarga', 'back:grp')]);
+  return Markup.inlineKeyboard([...buttons, CANCEL]);
+}
+
+// Podkategoriyalar (3-daraja)
+function subCategories(rows) {
   const buttons = rows.map(c => [Markup.button.callback(c.name, `sub:${c.id}`)]);
-  buttons.push([Markup.button.callback('⬅️ Orqaga', 'back:cat')]);
+  buttons.push([Markup.button.callback('⬅️ Kategoriyalarga', 'back:cat')]);
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }
 
@@ -160,6 +163,6 @@ function pager(page, total, perPage, prefix = 'book') {
 }
 
 module.exports = {
-  MENU, mainMenu, accounts, rootCategories, subCategories,
+  MENU, mainMenu, accounts, groups, categories, subCategories,
   payDate, period, monthGrid, skipNote, confirm, currencies, rangePreset, pager,
 };
