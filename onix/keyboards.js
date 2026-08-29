@@ -61,15 +61,18 @@ function accounts(rows, prefix = 'acc', { showBalance = false } = {}) {
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }
 
+// Emoji bo'lsa oldiga qo'shadi, bo'lmasa nomni yolg'iz qoldiradi
+const label = (row) => (row.emoji ? `${row.emoji} ${row.name}` : row.name);
+
 // Guruhlar (1-daraja) — bittadan, nomlari uzun bo'lishi mumkin
 function groups(rows) {
-  const buttons = rows.map(g => [Markup.button.callback(`${g.emoji || '•'} ${g.name}`, `grp:${g.id}`)]);
+  const buttons = rows.map(g => [Markup.button.callback(label(g), `grp:${g.id}`)]);
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }
 
 // Kategoriyalar (2-daraja)
 function categories(rows) {
-  const buttons = rows.map(c => [Markup.button.callback(`${c.emoji || '•'} ${c.name}`, `cat:${c.id}`)]);
+  const buttons = rows.map(c => [Markup.button.callback(label(c), `cat:${c.id}`)]);
   buttons.push([Markup.button.callback('⬅️ Guruhlarga', 'back:grp')]);
   return Markup.inlineKeyboard([...buttons, CANCEL]);
 }

@@ -331,7 +331,7 @@ bot.action(/^grp:(\d+)$/, async (ctx) => {
   const g = await db.getCategory(+ctx.match[1]);
   if (!g) return;
   Object.assign(wiz(ctx).d, { groupId: g.id, groupName: g.name, groupEmoji: g.emoji });
-  await ctx.editMessageText(`✅ Guruh: <b>${f.esc(g.emoji || '')} ${f.esc(g.name)}</b>`, HTML);
+  await ctx.editMessageText(`✅ Guruh: <b>${f.esc([g.emoji, g.name].filter(Boolean).join(' '))}</b>`, HTML);
   return advance(ctx);
 });
 

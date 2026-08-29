@@ -19,6 +19,9 @@ function row(label, amount, currency, { indent = 0, dots = false } = {}) {
 
 const curLabel = (c) => (c === 'UZS' ? "🇺🇿 so'm" : '💵 dollar');
 
+// Emoji bo'lsa oldiga, bo'lmasa nomning o'zi
+const named = (row) => (row.emoji ? `${row.emoji} ${row.name}` : row.name);
+
 // ================= Pul oqimi =================
 
 function cashFlow(cf) {
@@ -30,7 +33,7 @@ function cashFlow(cf) {
   L.push('📥 KIRIM');
   if (!cf.income.length) L.push('   —');
   for (const g of cf.income) {
-    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c));
+    L.push(row(named(g), g.total, c));
     for (const k of g.cats) L.push(row(`· ${k.name}`, k.total, c, { indent: 3 }));
   }
   L.push(LINE);
@@ -40,7 +43,7 @@ function cashFlow(cf) {
   L.push('📤 CHIQIM');
   if (!cf.expense.length) L.push('   —');
   for (const g of cf.expense) {
-    L.push(row(`${g.emoji || '•'} ${g.name}`, g.total, c));
+    L.push(row(named(g), g.total, c));
     for (const k of g.cats) L.push(row(`· ${k.name}`, k.total, c, { indent: 3 }));
   }
   L.push(LINE);
@@ -115,9 +118,9 @@ function profitLoss(pl, prev) {
 
 // Guruh → kategoriya → podkategoriya uch pog'onasini chizadi
 function tree(L, group, currency) {
-  L.push(row(`${group.emoji || '•'} ${group.name}`, group.total, currency));
+  L.push(row(named(group), group.total, currency));
   for (const cat of group.cats) {
-    L.push(row(`${cat.emoji ? cat.emoji + ' ' : ''}${cat.name}`, cat.total, currency, { indent: 2 }));
+    L.push(row(named(cat), cat.total, currency, { indent: 2 }));
     for (const sub of cat.subs) L.push(row(`· ${sub.name}`, sub.total, currency, { indent: 5 }));
   }
   L.push('');

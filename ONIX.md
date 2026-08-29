@@ -187,7 +187,28 @@ qatorda `→ P&L: Fev 2026` belgisi bilan.
 
 ---
 
-## 8. O'rnatish
+## 8. Tokensiz sinab ko'rish
+
+Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
+
+```bash
+npm run onix:schema
+npm run onix:categories
+npm run onix:demo
+```
+
+Demo botning **haqiqiy kodini** yurgizadi — faqat tarmoqqa chiqmaydi:
+har bir ekran, tugma va hisobot terminalda chiziladi. 11 qadamli ssenariy:
+jamoaning username bo'yicha ulanishi, kirim kiritish, hodimga hisobdor pul
+berish, hodimning o'z pulidan xarajat qilishi, podkategoriyasiz kategoriya,
+kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
+
+> Demo bazadagi operatsiya, foydalanuvchi va podotchyot hisoblarini tozalaydi —
+> ishlab turgan bazada ishlatmang.
+
+---
+
+## 9. O'rnatish
 
 ```bash
 npm install
@@ -247,7 +268,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 9. Sozlash buyruqlari (admin)
+## 10. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -271,7 +292,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 10. Fayllar
+## 11. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -281,13 +302,13 @@ onix/reports.js      pul oqimi, foyda-zarar, podotchyot hisob-kitobi
 onix/views.js        hisobotlarni matn ko'rinishida chizish
 onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
-onix/tools/          kategoriyalarni matn faylidan yuklovchi
+onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
 onix/tests/          testlar (91 ta tekshiruv)
 ```
 
-## 11. Testlar
+## 12. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 
