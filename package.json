@@ -10,7 +10,8 @@
     "onix:categories": "node onix/tools/import-categories.js onix/kategoriyalar.txt",
     "onix:users": "node onix/tools/import-users.js onix/jamoa.txt",
     "onix:demo": "node onix/tools/demo.js",
-    "onix:check": "node onix/tools/check.js"
+    "onix:check": "node onix/tools/check.js",
+    "onix:setup": "node onix/tools/setup.js"
   },
   "dependencies": {
     "telegraf": "^4.16.0",

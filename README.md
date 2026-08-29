@@ -10,6 +10,8 @@ Scandi Group uchun Telegram botlar.
 
 ## Ishga tushirish
 
+👉 **Birinchi marta ishlatyapsizmi?** [ISHGA-TUSHIRISH.md](ISHGA-TUSHIRISH.md) — qadamma-qadam, oddiy tilda.
+
 ```bash
 npm install
 cp .env.example .env      # kerakli tokenlarni to'ldiring
