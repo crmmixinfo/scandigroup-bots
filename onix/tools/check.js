@@ -61,7 +61,7 @@ async function main() {
   else ok('Baza manzili berilgan', hasDbUrl ? 'DATABASE_URL' : 'PG* o\'zgaruvchilari');
 
   const admin = parseInt(process.env.SUPER_ADMIN_ID, 10);
-  if (!admin) warn('SUPER_ADMIN_ID yo\'q', 'botga /myid yozib o\'z ID ingizni oling — zaxira kirish uchun kerak');
+  if (!admin) console.log(`${C.dim}·  SUPER_ADMIN_ID berilmagan — admin oldindan yozilgan bo'lsa shart emas${C.off}`);
   else ok('SUPER_ADMIN_ID bor', String(admin));
 
   // ---------- 2. Baza ----------
@@ -108,7 +108,17 @@ async function main() {
     if (pending.n) console.log(`   ${C.dim}⏳ ${pending.n} ta odam /start bosishini kutmoqda${C.off}`);
   }
 
-  if (!users.some(r => r.role === 'admin') && !admin) {
+  // Kutish ro'yxatidagi admin ham hisobga olinadi — u /start bosganda admin bo'ladi
+  const pendingAdmins = await db.one("SELECT COUNT(*)::int AS n FROM onix_pending_users WHERE role = 'admin'");
+  const hasAdmin = users.some(r => r.role === 'admin');
+
+  if (hasAdmin) {
+    ok('Administrator bor');
+  } else if (pendingAdmins.n) {
+    ok('Administrator kutilmoqda', `${pendingAdmins.n} ta — /start bosganda ulanadi`);
+  } else if (admin) {
+    ok('Administrator', 'SUPER_ADMIN_ID orqali');
+  } else {
     bad('Administrator yo\'q va SUPER_ADMIN_ID ham berilmagan', 'aks holda tizimga kira olmaysiz');
   }
   if (!users.some(r => r.role === 'cashier') && !pending.n) {
