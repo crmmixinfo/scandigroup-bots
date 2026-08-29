@@ -27,16 +27,33 @@ va sanalar mos kelmasa tasdiq ekranida ogohlantiradi.
 
 ---
 
-## 2. Rollar
+## 2. Rollar va kim nimani ko'radi
 
-| Rol | Kim | Nima qiladi |
+| Rol | Nima qiladi | Nima ko'radi |
 |---|---|---|
-| `cashier` | 1 ta kassir | Kirim, chiqim, hodimlarga pul berish, konvertatsiya |
-| `staff` | 3 ta hodim | Faqat **o'z qo'lidagi puldan** xarajat kiritadi |
-| `manager` | 2 ta rahbar | Faqat ko'radi — hisobotlar, qoldiqlar, daftar |
-| `admin` | Egasi | Hammasi + foydalanuvchi/kategoriya sozlamalari |
+| `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Barcha kassa qoldiqlari, kassa daftari |
+| `staff` | **Faqat o'z qo'lidagi puldan** xarajat kiritadi | **Faqat o'zi kiritgan yozuvlar** va o'z qoldig'i |
+| `manager` | Hech nima kiritmaydi | **Hammasini** — barcha hisobotlar, qoldiqlar, daftar |
+| `admin` | Hammasi | Hammasi + sozlamalar |
 
----
+### Hodim uchun chegara
+
+Hodim ko'radi:
+- 💸 o'z xarajatini kiritish oynasi
+- 👛 **o'z** podotchyot qoldig'i
+- 📋 **faqat o'zi kiritgan** operatsiyalar
+
+Hodim ko'rmaydi: kompaniya kassalari qoldig'i, kassa daftari, pul oqimi,
+foyda-zarar, boshqa hodimlarning yozuvlari va qoldiqlari.
+
+Cheklov faqat tugmalarni yashirish bilan emas — **serverda** tekshiriladi:
+
+- menyu matnini qo'lda yozsa ham ruxsat so'raladi;
+- soxta tugma yuborib boshqa hisobni tanlab bo'lmaydi — hodim faqat o'z
+  podotchyot hisobidan sarflay oladi, kompaniya kassasidan emas;
+- hisobot callback'ini qo'lda yuborsa hech narsa qaytmaydi.
+
+Bularning har biri testlar bilan qoplangan.
 
 ## 3. Podotchyot (hisobdor pul)
 
@@ -177,6 +194,7 @@ npm install
 cp .env.example .env          # ONIX_BOT_TOKEN, DATABASE_URL, SUPER_ADMIN_ID to'ldiring
 npm run onix:schema           # bazani tayyorlash (qayta ishga tushirsa ham xavfsiz)
 npm run onix:categories       # kategoriyalarni yuklash
+npm run onix:users            # jamoani yuklash
 npm run onix                  # botni ishga tushirish
 ```
 
@@ -265,7 +283,8 @@ onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
 onix/tools/          kategoriyalarni matn faylidan yuklovchi
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
-onix/tests/          testlar (82 ta tekshiruv)
+onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
+onix/tests/          testlar (91 ta tekshiruv)
 ```
 
 ## 11. Testlar
@@ -277,7 +296,8 @@ psql "$TEST_DATABASE_URL" -f onix-schema.sql
 PGDATABASE=onix_test npm run onix:test
 ```
 
-Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar, username bo'yicha
+Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar va hodim uchun
+ma'lumot chegarasi (soxta tugma va qo'lda yozilgan menyu bilan urinishlar), username bo'yicha
 ulanish va tugma bilan tasdiqlash, kiritish sehrgarining
 har bir qadami, ikki va uch pog'onali kategoriyalar, podotchyot hisob-kitobi,
 valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, va **eng asosiysi** —

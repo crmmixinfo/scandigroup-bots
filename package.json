@@ -7,7 +7,8 @@
     "onix": "node onix-bot.js",
     "onix:schema": "psql \"$DATABASE_URL\" -f onix-schema.sql",
     "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js",
-    "onix:categories": "node onix/tools/import-categories.js onix/kategoriyalar.txt"
+    "onix:categories": "node onix/tools/import-categories.js onix/kategoriyalar.txt",
+    "onix:users": "node onix/tools/import-users.js onix/jamoa.txt"
   },
   "dependencies": {
     "telegraf": "^4.16.0",

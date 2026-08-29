@@ -1,0 +1,17 @@
+# ONIX — jamoa ro'yxati
+#
+# Ko'rinishi:   Ism Familiya  @username  Rol
+#      yoki:    Ism Familiya  123456789  Rol      (raqamli ID bilan)
+#
+# Rollar:  Admin · Kassir · Hodim · Rahbar
+#          (Administrator, Cashier, Staff, Manager ham tushuniladi)
+#
+# Yuklash:      npm run onix:users
+# Tekshirish:   npm run onix:users -- --dry        (bazaga yozmaydi)
+#
+# @username berilsa — odam kutish ro'yxatiga tushadi va botga /start
+# bosgan zahoti avtomat ulanadi. Raqamli ID berilsa — darhol qo'shiladi.
+
+Saidaziz Saidiy        @saidazizsaidiy   Admin
+Asadbek Abduqahhorov   @kuchimala70      Hodim
+Burxon                 @ABB_018          Hodim

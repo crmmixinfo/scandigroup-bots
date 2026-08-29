@@ -31,6 +31,8 @@ const canEnterCash = (u) => u.role === 'admin' || u.role === 'cashier';
 const canEnterOwn  = (u) => u.role === 'staff';
 const canReport    = (u) => u.role === 'admin' || u.role === 'manager';
 const canSeeBook   = (u) => u.role !== 'staff';
+// Hodim faqat o'z podotchyot qoldig'ini ko'radi, kompaniya kassalarini emas
+const canSeeAllBalances = (u) => u.role !== 'staff';
 
 const ROLE_LABEL = {
   admin: '👑 Administrator', cashier: '💼 Kassir',
@@ -170,14 +172,13 @@ async function ask(ctx) {
 
   switch (step) {
     case 'account': {
-      let rows;
-      if (w.flow === 'expense' && canEnterOwn(ctx.user)) {
-        rows = await db.balances({ kind: 'podotchet', ownerTgId: ctx.user.tg_id });
-        if (!rows.length) return fail(ctx, "Sizda podotchyot hisobi yo'q. Administratorga murojaat qiling.");
-        return ctx.reply('👛 Qaysi puldan sarfladingiz?', K.accounts(rows, 'acc', { showBalance: true }));
+      const rows = await allowedSourceAccounts(ctx);
+      if (!rows.length) {
+        return fail(ctx, canEnterOwn(ctx.user)
+          ? "Sizda podotchyot hisobi yo'q. Administratorga murojaat qiling."
+          : "Hisoblar topilmadi.");
       }
-      rows = await db.balances({ kind: 'kassa' });
-      const prompt = {
+      const prompt = canEnterOwn(ctx.user) ? '👛 Qaysi puldan sarfladingiz?' : {
         income:    '💰 Pul qaysi kassaga kirdi?',
         expense:   '💸 Pul qaysi kassadan chiqdi?',
         podotchet: '💼 Qaysi kassadan berilsin?',
@@ -187,13 +188,14 @@ async function ask(ctx) {
     }
 
     case 'staff': {
-      const rows = await db.balances({ kind: 'podotchet', currency: d.currency });
+      const rows = await allowedTargetAccounts(ctx);
       if (!rows.length) return fail(ctx, `${d.currency} bo'yicha podotchyot hisobi yo'q.`);
       return ctx.reply('🧾 Kimga beriladi?', K.accounts(rows, 'to', { showBalance: true }));
     }
 
     case 'toaccount': {
-      const rows = (await db.balances({ kind: 'kassa' })).filter(a => a.account_id !== d.accountId);
+      const rows = await allowedTargetAccounts(ctx);
+      if (!rows.length) return fail(ctx, "Boshqa hisob topilmadi.");
       return ctx.reply('📥 Qaysi hisobga tushadi?', K.accounts(rows, 'to', { showBalance: true }));
     }
 
@@ -248,6 +250,27 @@ async function ask(ctx) {
   }
 }
 
+// Foydalanuvchi shu qadamda tanlashi mumkin bo'lgan manba hisoblari.
+// Tugmalar ham, kelgan javobni tekshirish ham shu ro'yxatga tayanadi —
+// shuning uchun soxta tugma bosib boshqa hisobni tanlab bo'lmaydi.
+async function allowedSourceAccounts(ctx) {
+  // Hodim faqat o'z podotchyot pulidan sarflaydi
+  if (canEnterOwn(ctx.user)) {
+    return db.balances({ kind: 'podotchet', ownerTgId: ctx.user.tg_id });
+  }
+  return db.balances({ kind: 'kassa' });
+}
+
+// Qabul qiluvchi hisob: podotchyot berishda hodimlar, konvertatsiyada kassalar
+async function allowedTargetAccounts(ctx) {
+  const w = wiz(ctx);
+  if (w.flow === 'podotchet') return db.balances({ kind: 'podotchet', currency: w.d.currency });
+  if (w.flow === 'convert') {
+    return (await db.balances({ kind: 'kassa' })).filter(a => a.account_id !== w.d.accountId);
+  }
+  return [];
+}
+
 function draftData(d, flow) {
   return {
     type: flow === 'podotchet' || flow === 'convert' ? 'transfer' : flow,
@@ -272,6 +295,10 @@ const at = (ctx, ...steps) => wiz(ctx) && steps.includes(curStep(ctx));
 bot.action(/^acc:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   if (!at(ctx, 'account')) return;
+  const allowed = await allowedSourceAccounts(ctx);
+  if (!allowed.some(a => a.account_id === +ctx.match[1])) {
+    return ctx.answerCbQuery('Bu hisob sizga ochiq emas', { show_alert: true }).catch(() => {});
+  }
   const acc = await db.getAccount(+ctx.match[1]);
   if (!acc) return;
   Object.assign(wiz(ctx).d, {
@@ -285,6 +312,10 @@ bot.action(/^acc:(\d+)$/, async (ctx) => {
 bot.action(/^to:(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   if (!at(ctx, 'staff', 'toaccount')) return;
+  const allowed = await allowedTargetAccounts(ctx);
+  if (!allowed.some(a => a.account_id === +ctx.match[1])) {
+    return ctx.answerCbQuery('Bu hisob sizga ochiq emas', { show_alert: true }).catch(() => {});
+  }
   const acc = await db.getAccount(+ctx.match[1]);
   if (!acc) return;
   const d = wiz(ctx).d;
@@ -560,7 +591,7 @@ menu(K.MENU.myOps, canEnterOwn, async (ctx) => {
     ops.map(V.operationLine).join('\n\n'), HTML);
 });
 
-menu(K.MENU.balance, null, async (ctx) => {
+menu(K.MENU.balance, canSeeAllBalances, async (ctx) => {
   const rows = await db.balances();
   return ctx.reply(V.balances(rows), HTML);
 });

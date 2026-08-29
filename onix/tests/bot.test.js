@@ -204,6 +204,40 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await cb('ok:admin:403:Kimdir', 201);
   eq((await db.getUser(403)) === null, true, 'hodim tasdiqlay olmadi');
 
+  // ═══ 6d. HODIM FAQAT O'ZINIKINI KO'RADI ═══
+  console.log('\n─── Hodim uchun ma\'lumot chegarasi ───');
+
+  // Tugma menyusida yo'q, lekin matnni qo'lda yozib ko'radi
+  sent = []; await msg(K.MENU.balance, 201);
+  ok(last().includes('ochiq emas'), 'hodim umumiy kassa qoldig\'ini ko\'ra olmadi');
+  ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'kompaniya kassalari ko\'rinmadi');
+
+  sent = []; await msg(K.MENU.book, 201);
+  ok(last().includes('ochiq emas'), 'hodim kassa daftarini ko\'ra olmadi');
+
+  // O'z qoldig'ini esa ko'radi
+  sent = []; await msg(K.MENU.myBalance, 201);
+  ok(last().includes('QO\'LINGIZDAGI'), 'o\'z qoldig\'ini ko\'rdi');
+  ok(!last().includes('Plastik'), 'unda kompaniya kassalari yo\'q');
+
+  // Hisobot callback'ini qo'lda yuborsa ham hech narsa chiqmasin
+  sent = []; await cb('rcur:UZS', 201);
+  ok(!sent.some(x => x.text && /PUL OQIMI|FOYDA-ZARAR/.test(x.text)), 'soxta hisobot so\'rovi ish bermadi');
+
+  // ⚠️ Soxta tugma: hodim kompaniya kassasidan xarajat yozmoqchi
+  const opsBefore = (await db.countOperations({})).n;
+  await msg(K.MENU.myExpense, 201);
+  sent = []; await cb(`acc:${naqdSum}`, 201);          // o'ziniki emas — kompaniya kassasi
+  ok(!sent.some(x => x.text && x.text.includes('Guruhni')), 'begona hisob rad etildi');
+  await cb('cancel', 201);
+  eq((await db.countOperations({})).n, opsBefore, 'hech narsa yozilmadi');
+
+  // O'z hisobi bilan esa ishlaydi
+  await msg(K.MENU.myExpense, 201);
+  sent = []; await cb(`acc:${aliSum}`, 201);
+  ok(last().includes('Guruhni'), 'o\'z hisobi qabul qilindi');
+  await cb('cancel', 201);
+
   // ═══ 7. RAHBAR: HISOBOTLAR ═══
   console.log('\n─── Rahbar: hisobotlar ───');
   sent = []; await msg(K.MENU.pnl, 301);
