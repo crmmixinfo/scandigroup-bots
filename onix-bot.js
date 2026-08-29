@@ -189,7 +189,7 @@ async function ask(ctx) {
 
     case 'staff': {
       const rows = await allowedTargetAccounts(ctx);
-      if (!rows.length) return fail(ctx, `${d.currency} bo'yicha podotchyot hisobi yo'q.`);
+      if (!rows.length) return fail(ctx, await noWalletsYet(d.currency));
       return ctx.reply('🧾 Kimga beriladi?', K.accounts(rows, 'to', { showBalance: true }));
     }
 
@@ -284,7 +284,30 @@ function draftData(d, flow) {
 
 async function fail(ctx, text) {
   ctx.session.w = null;
-  return ctx.reply(`⚠️ ${text}`, K.mainMenu(ctx.user.role));
+  return ctx.reply(`⚠️ ${text}`, { ...HTML, ...K.mainMenu(ctx.user.role) });
+}
+
+// Hodimning "hamyoni" u botga /start bosganda ochiladi. Shu sababli
+// hech kim ulanmagan bo'lsa, kimni kutayotganimizni aytib qo'yamiz —
+// aks holda «hisob yo'q» degan xabar odamni boshi berk ko'chaga olib boradi.
+async function noWalletsYet(currency) {
+  const waiting = (await db.listPendingUsers()).filter(u => u.role === 'staff');
+  const active  = (await db.listUsers()).filter(u => u.role === 'staff');
+
+  let text = `<b>Hozircha hech kimning hamyoni ochilmagan.</b>\n\n` +
+             `Hodimning hamyoni u botga <code>/start</code> bosgan zahoti ochiladi.\n`;
+
+  if (waiting.length) {
+    text += `\n⏳ <b>Kutilmoqda:</b>\n` +
+      waiting.map(u => `   • ${f.esc(u.full_name)} — <code>@${f.esc(u.username)}</code>`).join('\n') +
+      `\n\nUlarga ayting: botni ochib <code>/start</code> bossin.`;
+  } else if (active.length) {
+    text += `\n${currency} bo'yicha hisob topilmadi. Administratorga murojaat qiling.`;
+  } else {
+    text += `\nHali birorta hodim qo'shilmagan.\n` +
+            `Qo'shish: <code>/add_user @username staff Ism Familiya</code>`;
+  }
+  return text;
 }
 
 // ================= Sehrgar javoblarini qabul qilish =================
