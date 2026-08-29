@@ -39,6 +39,7 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   await db.q('TRUNCATE onix_operations RESTART IDENTITY CASCADE');
   await db.q("DELETE FROM onix_accounts WHERE kind='podotchet'");
   await db.q('DELETE FROM onix_users');
+  await db.q('DELETE FROM onix_pending_users');
   await db.q('DELETE FROM onix_categories');
   await seedTree();
 
