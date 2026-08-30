@@ -154,18 +154,36 @@ const rangePreset = (prefix) => Markup.inlineKeyboard([
   CANCEL,
 ]);
 
-// Daftar sahifalash
-function pager(page, total, perPage, prefix = 'book') {
+// Daftar: har yozuv uchun o'chirish tugmasi + sahifalash
+function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book', canDelete } = {}) {
+  const rows = [];
+
+  // O'chirish tugmalari — uchtadan, yozuv raqami bilan
+  const removable = ops.filter(o => !canDelete || canDelete(o));
+  for (let i = 0; i < removable.length; i += 3) {
+    rows.push(removable.slice(i, i + 3).map(o =>
+      Markup.button.callback(`🗑 #${o.id}`, `rm:${o.id}`)));
+  }
+
   const pages = Math.max(1, Math.ceil(total / perPage));
-  if (pages < 2) return Markup.inlineKeyboard([]);
-  const row = [];
-  if (page > 0)         row.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
-  row.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
-  if (page < pages - 1) row.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
-  return Markup.inlineKeyboard([row]);
+  if (pages > 1) {
+    const nav = [];
+    if (page > 0)         nav.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
+    nav.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
+    if (page < pages - 1) nav.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
+    rows.push(nav);
+  }
+  return Markup.inlineKeyboard(rows);
 }
+
+// O'chirishni tasdiqlash
+const confirmDelete = (id) => Markup.inlineKeyboard([
+  [Markup.button.callback('🗑 Ha, bekor qilinsin', `rmy:${id}`),
+   Markup.button.callback('✖️ Yo\'q', 'rmn')],
+]);
 
 module.exports = {
   MENU, mainMenu, accounts, groups, categories, subCategories,
-  payDate, period, monthGrid, skipNote, confirm, currencies, rangePreset, pager,
+  payDate, period, monthGrid, skipNote, confirm, currencies, rangePreset,
+  bookKeyboard, confirmDelete,
 };

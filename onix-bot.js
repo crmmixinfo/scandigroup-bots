@@ -634,11 +634,9 @@ menu(K.MENU.myBalance, canEnterOwn, async (ctx) => {
   return ctx.reply(V.balances(rows, "👛 QO'LINGIZDAGI QOLDIQ"), HTML);
 });
 
-menu(K.MENU.myOps, canEnterOwn, async (ctx) => {
-  const ops = await db.listOperations({ createdBy: ctx.user.tg_id, limit: 15 });
-  if (!ops.length) return ctx.reply("📭 Hali operatsiya kiritmagansiz.");
-  return ctx.reply(`<b>📋 Oxirgi ${ops.length} ta operatsiyangiz</b>\n\n` +
-    ops.map(V.operationLine).join('\n\n'), HTML);
+menu(K.MENU.myOps, canEnterOwn, (ctx) => {
+  ctx.session.r = { kind: 'myops', page: 0 };
+  return renderBook(ctx);
 });
 
 menu(K.MENU.balance, canSeeAllBalances, async (ctx) => {
@@ -767,23 +765,79 @@ async function renderRange(ctx, from, to) {
 
 const PER_PAGE = 8;
 
+// Admin har qanday yozuvni, qolganlar faqat o'zinikini bekor qila oladi.
+// Buyruq (/del) ham, tugma ham shu qoidaga tayanadi.
+const mayDelete = (user, op) =>
+  isAdmin(user) || String(op.created_by) === String(user.tg_id);
+
 async function renderBook(ctx, edit = false) {
   const r = ctx.session.r;
+  const mine = r.kind === 'myops';
+  const filter = mine ? { createdBy: ctx.user.tg_id } : { from: r.from, to: r.to };
+
   const [ops, count] = await Promise.all([
-    db.listOperations({ from: r.from, to: r.to, limit: PER_PAGE, offset: r.page * PER_PAGE }),
-    db.countOperations({ from: r.from, to: r.to }),
+    db.listOperations({ ...filter, limit: PER_PAGE, offset: r.page * PER_PAGE }),
+    db.countOperations(filter),
   ]);
-  const text = V.book(ops, { from: r.from, to: r.to, page: r.page, total: count.n });
-  const kb = K.pager(r.page, count.n, PER_PAGE, 'book');
+
+  const text = mine
+    ? `<b>📋 Mening operatsiyalarim</b>\n${count.n} ta yozuv\n\n` +
+      (ops.length ? ops.map(V.operationLine).join('\n\n') : '<i>Hali operatsiya kiritmagansiz</i>')
+    : V.book(ops, { from: r.from, to: r.to, page: r.page, total: count.n });
+
+  const kb = K.bookKeyboard(ops, {
+    page: r.page, total: count.n, perPage: PER_PAGE,
+    prefix: mine ? 'myops' : 'book',
+    canDelete: (op) => mayDelete(ctx.user, op),
+  });
   const opts = { ...HTML, ...kb };
-  return edit ? ctx.editMessageText(text, opts) : ctx.editMessageText(text, opts);
+  // Tugmadan kelgan bo'lsa xabarni yangilaymiz, menyudan kelgan bo'lsa yangisini yuboramiz
+  return edit ? ctx.editMessageText(text, opts) : ctx.reply(text, opts);
 }
 
-bot.action(/^book:(\d+)$/, async (ctx) => {
+bot.action(/^(book|myops):(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
-  if (!ctx.session.r || ctx.session.r.kind !== 'book') return;
-  ctx.session.r.page = +ctx.match[1];
+  if (!ctx.session.r) return;
+  ctx.session.r.page = +ctx.match[2];
   return renderBook(ctx, true);
+});
+
+// ---------- Yozuvni tugma bilan bekor qilish ----------
+
+bot.action(/^rm:(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const op = await db.getOperation(+ctx.match[1]);
+  if (!op)          return ctx.answerCbQuery("Yozuv topilmadi", { show_alert: true }).catch(() => {});
+  if (op.deleted_at) return ctx.answerCbQuery("Bu yozuv allaqachon bekor qilingan", { show_alert: true }).catch(() => {});
+  if (!mayDelete(ctx.user, op)) {
+    return ctx.answerCbQuery("Faqat o'z yozuvingizni bekor qila olasiz", { show_alert: true }).catch(() => {});
+  }
+  return ctx.reply(
+    `🗑 <b>Bu yozuv bekor qilinsinmi?</b>\n\n${V.operationLine(op)}\n\n` +
+    `<i>Kassa qoldig'i shu zahoti to'g'rilanadi.</i>`,
+    { ...HTML, ...K.confirmDelete(op.id) });
+});
+
+bot.action('rmn', async (ctx) => {
+  await ctx.answerCbQuery('Bekor qilinmadi');
+  return ctx.editMessageText('✖️ Yozuv joyida qoldi.').catch(() => {});
+});
+
+bot.action(/^rmy:(\d+)$/, async (ctx) => {
+  const op = await db.getOperation(+ctx.match[1]);
+  if (!op || op.deleted_at) return ctx.answerCbQuery('Yozuv topilmadi yoki allaqachon bekor qilingan');
+  if (!mayDelete(ctx.user, op)) return ctx.answerCbQuery("Ruxsat yo'q", { show_alert: true });
+
+  await db.softDelete(op.id, ctx.user.tg_id, 'tugma orqali bekor qilindi');
+  await ctx.answerCbQuery('Bekor qilindi');
+  await ctx.editMessageText(
+    `🗑 <b>Bekor qilindi</b>  <code>#${op.id}</code>\n\n${V.operationLine(op)}`, HTML);
+
+  // Yangi qoldiqni ko'rsatamiz
+  const acc = (await db.balances({ currency: op.currency })).find(a => a.account_id === op.account_id);
+  if (acc) {
+    await ctx.reply(`💼 <b>${f.esc(acc.name)}</b> yangi qoldiq: <b>${f.money(acc.balance, acc.currency)}</b>`, HTML);
+  }
 });
 
 // ================= Sozlamalar (admin) =================

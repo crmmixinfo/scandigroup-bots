@@ -193,17 +193,21 @@ daromad bo'lib kirib, birinchi oy foydasini yolg'on ko'rsatardi. Shuning uchun
 Sana odatda hisob yuritishni boshlagan kun bo'ladi. Shu sanadan keyingi
 davrlarda u avtomat «boshlang'ich qoldiq» bo'lib o'tadi.
 
-### Test yozuvlarini tozalash
+### Yozuvni bekor qilish
 
-Sinov uchun kiritilgan operatsiyalarni bekor qilish:
+**📋 Kassa daftari** ni oching — har bir yozuv uchun `🗑 #12` tugmasi chiqadi.
+Bosing, tasdiqlang — tamom. Kassa qoldig'i shu zahoti to'g'rilanadi.
 
-```
-/del 1 test
-/del 2 test
-```
+Buyruq bilan ham bo'ladi: `/del 12 sabab`
 
-Bekor qilingan yozuv kassa daftaridan ham, qoldiqdan ham chiqib ketadi.
-Bazada esa kim va nima sababdan bekor qilgani saqlanib qoladi.
+| Kim | Nimani bekor qila oladi |
+|---|---|
+| admin | har qanday yozuvni |
+| cashier, staff | faqat o'zi kiritganini |
+
+Bekor qilingan yozuv daftardan ham, qoldiqdan ham chiqib ketadi. Bazada esa
+kim, qachon va nima sababdan bekor qilgani saqlanib qoladi — hech narsa
+izsiz yo'qolmaydi.
 
 ---
 
@@ -342,7 +346,7 @@ onix/format.js       summa/sana formatlash va o'qish
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (97 ta tekshiruv)
+onix/tests/          testlar (105 ta tekshiruv)
 ```
 
 ## 13. Testlar
