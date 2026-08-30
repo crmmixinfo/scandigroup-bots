@@ -999,11 +999,76 @@ bot.catch((err, ctx) => {
   ctx.reply('⚠️ Xatolik yuz berdi. /menu bosing yoki administratorga xabar bering.').catch(() => {});
 });
 
-if (require.main === module) {
+// Tarmoq uzilishi botni o'ldirmasligi kerak: uy yoki ofis internetida
+// qisqa uzilish odatiy hol, bot esa kun bo'yi ishlab turishi kerak.
+// Telegram har doim JSON qaytaradi. JSON kelmasa — oradagi to'siq
+// (firewall, proksi, provayder sahifasi), token emas.
+const NETWORK_ERROR = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETDOWN|ENETUNREACH|EHOSTUNREACH|socket hang up|network timeout|invalid json response|fetch failed|request to .* failed/i;
+
+function explainNetworkError(err) {
+  console.error(`\n⚠️  Telegram serveriga ulanib bo'lmadi.`);
+  console.error(`   Sabab: ${err.message}\n`);
+  if (/ENOTFOUND|EAI_AGAIN/i.test(err.message)) {
+    console.error(`   Bu DNS muammosi — kompyuter api.telegram.org manzilini topa olmayapti.`);
+    console.error(`   Tekshiring:`);
+    console.error(`     1. Internet ishlayaptimi?`);
+    console.error(`     2. DNS ni almashtiring: Tizim sozlamalari → Tarmoq → DNS → 1.1.1.1`);
+    console.error(`     3. Ba'zi tarmoqlarda Telegram bloklangan — VPN yoqib ko'ring\n`);
+  } else if (/invalid json response|request to .* failed/i.test(err.message)) {
+    console.error(`   Telegram JSON qaytarmadi — yo'lda firewall yoki proksi bor.`);
+    console.error(`   Bu tokenning muammosi EMAS. VPN yoqib ko'ring.\n`);
+  }
+}
+
+async function start() {
+  const RETRY_SECONDS = 15;
+  let attempt = 0;
+
+  // Avval ulanishni tekshiramiz — "ishga tushdi" deyishdan oldin
+  for (;;) {
+    attempt++;
+    try {
+      bot.botInfo = await bot.telegram.getMe();
+      break;
+    } catch (err) {
+      if (!NETWORK_ERROR.test(err.message)) {
+        console.error(`\n❌ Token qabul qilinmadi: ${err.message}`);
+        console.error(`   .env dagi ONIX_BOT_TOKEN ni tekshiring (@BotFather → /mybots).\n`);
+        process.exit(1);
+      }
+      if (attempt === 1) explainNetworkError(err);
+      console.error(`   ⏳ ${RETRY_SECONDS} soniyadan keyin qayta urinaman… (${attempt}-urinish)`);
+      await new Promise(r => setTimeout(r, RETRY_SECONDS * 1000));
+    }
+  }
+
   bot.launch({ dropPendingUpdates: true });
-  console.log('✅ ONIX bot ishga tushdi');
-  process.once('SIGINT',  () => bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  console.log(`✅ ONIX bot ishga tushdi — @${bot.botInfo.username}`);
+  console.log(`   To'xtatish: Control + C`);
+}
+
+// Ishlab turganda internet uzilsa — jarayon o'lmasin, qayta ulanishni kutsin
+process.on('unhandledRejection', (err) => {
+  const message = (err && err.message) || String(err);
+  if (NETWORK_ERROR.test(message)) {
+    console.error(`⚠️  Tarmoq uzildi: ${message}`);
+    console.error(`   Internet tiklanganda bot o'zi davom etadi.`);
+    return;
+  }
+  console.error('Kutilmagan xato:', err);
+});
+
+if (require.main === module) {
+  start();
+  // Bot hali ishga tushmasdan Control+C bosilsa, stop() xato beradi —
+  // qayta ulanishni kutayotganda to'xtatish odatiy hol, xato emas.
+  const shutdown = (signal) => {
+    try { bot.stop(signal); } catch { /* hali ishga tushmagan */ }
+    console.log('\n👋 ONIX to\'xtatildi.');
+    process.exit(0);
+  };
+  process.once('SIGINT',  () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 module.exports = bot;
