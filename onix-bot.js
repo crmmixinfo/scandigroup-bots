@@ -194,9 +194,10 @@ async function ask(ctx) {
         expense:   '💸 Pul qaysi kassadan chiqdi?',
         podotchet: '💼 Qaysi kassadan berilsin?',
         convert:   '💼 Qaysi hisobdan?',
-        opening:   '⚖️ Qaysi kassaning qoldig\'ini kiritamiz?',
+        opening:   "⚖️ Qaysi hisobning qoldig'ini kiritamiz?\n\n" +
+                   "<i>Kassalar ham, hodimlar qo'lidagi pul ham.</i>",
       }[w.flow];
-      return ctx.reply(prompt, K.accounts(rows, 'acc', { showBalance: true }));
+      return ctx.reply(prompt, { ...HTML, ...K.accounts(rows, 'acc', { showBalance: true }) });
     }
 
     case 'staff': {
@@ -236,7 +237,7 @@ async function ask(ctx) {
       const unit = d.currency === 'UZS' ? "so'm" : 'dollar';
       if (w.flow === 'opening') {
         return ctx.reply(
-          `⚖️ <b>${f.esc(d.accountName)}</b> hisobida hozir qancha pul bor?\n\n` +
+          `⚖️ <b>${f.esc(d.accountName)}</b> — hozir qancha pul bor?\n\n` +
           `Summani kiriting (<b>${unit}</b>):\n` +
           `<i>Misol: 12 500 000  ·  12,5 mln</i>`, HTML);
       }
@@ -285,6 +286,9 @@ async function allowedSourceAccounts(ctx) {
   if (canEnterOwn(ctx.user)) {
     return db.balances({ kind: 'podotchet', ownerTgId: ctx.user.tg_id });
   }
+  // Boshlang'ich qoldiq hodimlarning qo'lidagi pulga ham kiritiladi —
+  // tizim ishga tushganda ularda allaqachon avans bo'lishi mumkin
+  if (wiz(ctx) && wiz(ctx).flow === 'opening') return db.balances();
   return db.balances({ kind: 'kassa' });
 }
 

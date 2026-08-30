@@ -176,7 +176,17 @@ Tizimni ishga tushirganda kassalarda allaqachon pul bo'ladi. Uni kiritish:
 
 **⚙️ Sozlamalar → ⚖️ Boshlang'ich qoldiq kiritish** → kassa → summa → sana.
 
-Har bir kassa uchun alohida kiritiladi (naqd sum, naqd $, plastik…).
+Ro'yxatda **kassalar ham, hodimlar qo'lidagi pul ham** chiqadi — tizim ishga
+tushganda hodimda allaqachon avans bo'lishi mumkin:
+
+```
+💵 Naqd (sum)                    💳 Plastik (sum)
+💵 Naqd ($)                      💳 Plastik ($)
+👛 Asadbek Abduqahhorov (sum)    👛 Burxon (sum)
+```
+
+Har biri uchun alohida kiritiladi. Faqat admin va kassir kirita oladi —
+hodim o'z qoldig'ini o'zi belgilay olmaydi.
 
 ### Nima uchun alohida tur
 

@@ -4,6 +4,7 @@ process.env.ONIX_BOT_TOKEN = '000:test';
 const bot = require('../../onix-bot');
 const db  = require('../db');
 const K   = require('../keyboards');
+const R   = require('../reports');
 
 bot.botInfo = { id: 1, is_bot: true, username: 'onix_test_bot', first_name: 'ONIX' };
 
@@ -310,6 +311,39 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(!sent.some(x => x.text && x.text.includes('bekor qilinsinmi')), "hodimga tasdiq ko'rsatilmadi");
   await cb(`rmy:${other.id}`, 201);
   eq((await db.countOperations({})).n, before - 1, "hodim begona yozuvni o'chira olmadi");
+
+  // ═══ 10. BOSHLANG'ICH QOLDIQ ═══
+  console.log('\n─── Boshlang\'ich qoldiq ───');
+  await db.addUser(1, 'Bosh admin', 'admin', 1);
+
+  sent = []; kb = null;
+  await msg(K.MENU.settings, 1);
+  await cb('openbal', 1);
+  const opts = (kb || []).flat().map(b => b.callback_data || '');
+  ok(opts.includes(`acc:${naqdSum}`), 'kassalar ro\'yxatda');
+  ok(opts.includes(`acc:${aliSum}`), 'hodim hamyoni ham ro\'yxatda');
+
+  const balBefore = Number((await db.balances({ kind: 'podotchet', ownerTgId: 201, currency: 'UZS' }))[0].balance);
+  await cb(`acc:${aliSum}`, 1);
+  await msg('1,8 mln', 1);
+  sent = []; await cb('dat:2026-05-01', 1);
+  ok(sent.some(x => x.text && x.text.includes('daromad emas')), 'tasdiqda tushuntirish bor');
+  ok(!sent.some(x => x.text && x.text.includes('P&amp;L davri')), 'P&L davri so\'ralmadi');
+  sent = []; await cb('save', 1);
+  ok(sent.some(x => x.text && x.text.includes('Saqlandi')), 'saqlandi');
+
+  const opened = await db.one("SELECT * FROM onix_operations WHERE type = 'opening' ORDER BY id DESC LIMIT 1");
+  eq(opened.category_id, 'null', 'kategoriyasiz');
+  eq(Number((await db.balances({ kind: 'podotchet', ownerTgId: 201, currency: 'UZS' }))[0].balance),
+     balBefore + 1_800_000, 'hodim qo\'lidagi qoldiqqa qo\'shildi');
+
+  const plMay = await R.profitLoss('2026-05-01', 'UZS');
+  eq(plMay.costs, 0, 'foyda-zararga xarajat bo\'lib kirmadi');
+  eq(plMay.revenue, 0, 'daromad ham emas');
+
+  // Hodim o'zi kirita olmasin
+  sent = []; await cb('openbal', 201);
+  ok(!sent.some(x => x.text && /qaysi hisobning qoldig/i.test(x.text)), 'hodimga ruxsat berilmadi');
 
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();
