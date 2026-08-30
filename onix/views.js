@@ -226,13 +226,19 @@ function draft(d) {
     L.push(row('Kategoriya',   d.catName, d.currency));
     L.push(row('Podkategoriya', d.categoryName, d.currency));
   }
-  L.push(row("To'lov sanasi", f.d(d.paidAt), d.currency));
-  L.push(row('P&L davri',     f.periodLabel(d.period), d.currency));
+  // Boshlang'ich qoldiqda sana yuqorida ko'rsatilgan, P&L davri esa yo'q
+  if (d.type !== 'opening') {
+    L.push(row("To'lov sanasi", f.d(d.paidAt), d.currency));
+    L.push(row('P&L davri',     f.periodLabel(d.period), d.currency));
+  }
   if (d.note) L.push(row('Izoh', d.note, d.currency));
 
-  const warn = f.iso(d.period).slice(0, 7) !== f.iso(d.paidAt).slice(0, 7)
+  const warn = d.type !== 'opening' && f.iso(d.period).slice(0, 7) !== f.iso(d.paidAt).slice(0, 7)
     ? `\n⚠️ <i>Pul ${f.periodShort(d.paidAt)} oyida harakat qiladi, ` +
       `lekin foyda-zararga ${f.periodLabel(d.period)} oyida tushadi.</i>\n`
+    : d.type === 'opening'
+      ? `\n<i>Bu daromad emas — kassa qoldig'iga qo'shiladi, ` +
+        `foyda-zararga kirmaydi.</i>\n`
     : '';
 
   return `<b>${title} — tasdiqlang</b>\n\n<pre>${f.esc(L.join('\n'))}</pre>${warn}`;

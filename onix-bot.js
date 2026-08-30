@@ -1113,9 +1113,28 @@ function explainNetworkError(err) {
   }
 }
 
+// Kod yangilanganda bazani ham yangilash kerak bo'ladi. Buni odam qo'lda
+// qilishini kutish xatoga olib keldi ("git pull qildim, lekin baza eski"),
+// shuning uchun bot o'zi tekshiradi. Sxema fayli idempotent — hech narsa
+// o'chmaydi, faqat yetishmayotgani qo'shiladi.
+async function ensureSchema() {
+  if (process.env.ONIX_SKIP_SCHEMA === '1') return;
+  const fs = require('fs');
+  const path = require('path');
+  try {
+    await db.q(fs.readFileSync(path.join(__dirname, 'onix-schema.sql'), 'utf8'));
+  } catch (err) {
+    console.error(`\n❌ Baza sxemasini yangilab bo'lmadi: ${err.message}`);
+    console.error(`   .env dagi DATABASE_URL ni tekshiring, yoki qo'lda: npm run onix:setup\n`);
+    process.exit(1);
+  }
+}
+
 async function start() {
   const RETRY_SECONDS = 15;
   let attempt = 0;
+
+  await ensureSchema();
 
   // Avval ulanishni tekshiramiz — "ishga tushdi" deyishdan oldin
   for (;;) {
