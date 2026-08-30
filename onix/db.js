@@ -21,8 +21,11 @@ const normUsername = (u) => String(u || '').trim().replace(/^@/, '').toLowerCase
 async function getUser(tgId) {
   const row = await one('SELECT * FROM onix_users WHERE tg_id = $1 AND active = true', [tgId]);
   if (row) return row;
-  // Super admin bazada bo'lmasa ham kira oladi — birinchi ishga tushirish uchun
-  if (tgId === SUPER_ADMIN_ID) return { tg_id: tgId, full_name: 'Super admin', role: 'admin', active: true };
+
+  // Super admin bazada bo'lmasa ham kira oladi — birinchi ishga tushirish uchun.
+  // Lekin uni darhol yozib qo'yamiz: onix_operations.created_by bu jadvalga
+  // bog'langan, shuning uchun yozilmagan admin operatsiya saqlay olmaydi.
+  if (tgId && tgId === SUPER_ADMIN_ID) return addUser(tgId, 'Super admin', 'admin', tgId);
   return null;
 }
 

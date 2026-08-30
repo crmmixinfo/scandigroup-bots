@@ -16,7 +16,7 @@ const MOVES = `
          o.type,
          o.paid_at,
          CASE
-           WHEN o.type = 'income'   AND o.account_id    = a.id THEN  o.amount
+           WHEN o.type IN ('income','opening') AND o.account_id = a.id THEN  o.amount
            WHEN o.type = 'transfer' AND o.to_account_id = a.id THEN  COALESCE(o.to_amount, o.amount)
            WHEN o.type = 'expense'  AND o.account_id    = a.id THEN -o.amount
            WHEN o.type = 'transfer' AND o.account_id    = a.id THEN -o.amount
@@ -64,6 +64,14 @@ async function cashFlow(from, to, currency) {
     GROUP BY n.flow, gp.id, gp.name, gp.emoji, p.id, p.name, p.emoji, n.id, n.name, n.emoji
     ORDER BY n.flow DESC, SUM(o.amount) DESC`, [from, to, currency]);
 
+  // Davr ICHIDA kiritilgan boshlang'ich qoldiq — kirim emas, alohida ko'rsatiladi
+  const opened = await db.one(`
+    SELECT COALESCE(SUM(o.amount), 0) AS total
+    FROM onix_operations o
+    JOIN onix_accounts a ON a.id = o.account_id
+    WHERE o.deleted_at IS NULL AND o.type = 'opening'
+      AND a.currency = $3 AND o.paid_at BETWEEN $1 AND $2`, [from, to, currency]);
+
   // Valyuta konvertatsiyasi — shu valyuta uchun sof kirim/chiqim
   const conv = await db.one(`
     SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS came_in,
@@ -78,12 +86,13 @@ async function cashFlow(from, to, currency) {
   const expenseTotal = sum(expense);
   const convIn  = Number(conv.came_in);
   const convOut = Number(conv.went_out);
-  const net     = incomeTotal - expenseTotal + convIn - convOut;
+  const openedInPeriod = Number(opened.total);
+  const net     = incomeTotal - expenseTotal + convIn - convOut + openedInPeriod;
 
   return {
     from, to, currency, opening,
     income, expense, incomeTotal, expenseTotal,
-    convIn, convOut, net,
+    convIn, convOut, openedInPeriod, net,
     closing: opening + net,
     accounts: await db.balances({ currency }),
   };

@@ -170,7 +170,44 @@ eski operatsiyalar hisobotlarda joyida qoladi.
 
 ---
 
-## 7. Hisobotlar
+## 7. Boshlang'ich qoldiq
+
+Tizimni ishga tushirganda kassalarda allaqachon pul bo'ladi. Uni kiritish:
+
+**⚙️ Sozlamalar → ⚖️ Boshlang'ich qoldiq kiritish** → kassa → summa → sana.
+
+Har bir kassa uchun alohida kiritiladi (naqd sum, naqd $, plastik…).
+
+### Nima uchun alohida tur
+
+Boshlang'ich qoldiqni oddiy kirim sifatida yozib bo'lmaydi — u foyda-zararga
+daromad bo'lib kirib, birinchi oy foydasini yolg'on ko'rsatardi. Shuning uchun
+`opening` degan alohida tur bor:
+
+| | Ta'siri |
+|---|---|
+| Kassa qoldig'i | ✅ qo'shiladi |
+| Pul oqimi | alohida qator — kirim sifatida sanalmaydi |
+| Foyda-zarar | ❌ umuman kirmaydi |
+
+Sana odatda hisob yuritishni boshlagan kun bo'ladi. Shu sanadan keyingi
+davrlarda u avtomat «boshlang'ich qoldiq» bo'lib o'tadi.
+
+### Test yozuvlarini tozalash
+
+Sinov uchun kiritilgan operatsiyalarni bekor qilish:
+
+```
+/del 1 test
+/del 2 test
+```
+
+Bekor qilingan yozuv kassa daftaridan ham, qoldiqdan ham chiqib ketadi.
+Bazada esa kim va nima sababdan bekor qilgani saqlanib qoladi.
+
+---
+
+## 8. Hisobotlar
 
 **💹 Pul oqimi** (`paid_at` bo'yicha) — boshlang'ich qoldiq, kirim va chiqim
 bo'limlar kesimida, valyuta konvertatsiyasi, sof oqim, yakuniy qoldiq,
@@ -187,7 +224,7 @@ qatorda `→ P&L: Fev 2026` belgisi bilan.
 
 ---
 
-## 8. Tokensiz sinab ko'rish
+## 9. Tokensiz sinab ko'rish
 
 Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
 
@@ -208,7 +245,7 @@ kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
 
 ---
 
-## 9. O'rnatish
+## 10. O'rnatish
 
 ```bash
 npm install
@@ -268,7 +305,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 10. Sozlash buyruqlari (admin)
+## 11. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -292,7 +329,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 11. Fayllar
+## 12. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -305,10 +342,10 @@ onix/format.js       summa/sana formatlash va o'qish
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (91 ta tekshiruv)
+onix/tests/          testlar (97 ta tekshiruv)
 ```
 
-## 12. Testlar
+## 13. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 

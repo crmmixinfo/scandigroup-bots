@@ -118,11 +118,14 @@ CREATE TRIGGER onix_categories_level_trg
 -- ---------- Kassa daftari (barcha operatsiyalar) ----------
 CREATE TABLE IF NOT EXISTS onix_operations (
   id             SERIAL PRIMARY KEY,
-  type           TEXT NOT NULL CHECK (type IN ('income','expense','transfer')),
+  type           TEXT NOT NULL CHECK (type IN ('income','expense','transfer','opening')),
   -- income   — kassaga pul kirdi        (P&L: daromad)
   -- expense  — kassadan pul chiqdi      (P&L: xarajat)
   -- transfer — ichki o'tkazma           (P&L ga TA'SIR QILMAYDI)
   --            kassir → hodim podotchyoti, kassa → plastik, sum → $ konvertatsiya
+  -- opening  — tizim ishga tushgandagi BOSHLANG'ICH QOLDIQ
+  --            Kassaga tushadi, lekin daromad EMAS — foyda-zararga kirmaydi,
+  --            pul oqimida ham kirim sifatida sanalmaydi (u yerda alohida qator).
 
   account_id     INT NOT NULL REFERENCES onix_accounts(id),
   -- income:   pul KIRGAN hisob
@@ -153,7 +156,8 @@ CREATE TABLE IF NOT EXISTS onix_operations (
     OR (type <> 'transfer' AND to_account_id IS NULL)
   ),
   CONSTRAINT onix_op_category_req CHECK (
-    (type = 'transfer' AND category_id IS NULL) OR (type <> 'transfer' AND category_id IS NOT NULL)
+    (type IN ('transfer','opening') AND category_id IS NULL)
+    OR (type IN ('income','expense') AND category_id IS NOT NULL)
   ),
   CONSTRAINT onix_op_period_first_day CHECK (EXTRACT(DAY FROM period) = 1)
 );
@@ -193,13 +197,26 @@ CREATE TRIGGER onix_operations_category_trg
   BEFORE INSERT OR UPDATE ON onix_operations
   FOR EACH ROW EXECUTE FUNCTION onix_check_operation_category();
 
+-- Avvalgi versiyadan yangilanish: 'opening' turi va cheklovlar
+DO $upgrade$
+BEGIN
+  ALTER TABLE onix_operations DROP CONSTRAINT IF EXISTS onix_operations_type_check;
+  ALTER TABLE onix_operations ADD  CONSTRAINT onix_operations_type_check
+    CHECK (type IN ('income','expense','transfer','opening'));
+
+  ALTER TABLE onix_operations DROP CONSTRAINT IF EXISTS onix_op_category_req;
+  ALTER TABLE onix_operations ADD  CONSTRAINT onix_op_category_req
+    CHECK ((type IN ('transfer','opening') AND category_id IS NULL)
+        OR (type IN ('income','expense') AND category_id IS NOT NULL));
+END $upgrade$;
+
 -- ---------- Qoldiqlar (hisoblanadigan ko'rinish) ----------
 CREATE OR REPLACE VIEW onix_balances AS
 SELECT
   a.id AS account_id, a.name, a.kind, a.currency, a.owner_tg_id, a.emoji, a.active, a.sort_order,
   COALESCE((
     SELECT SUM(CASE
-      WHEN o.type = 'income'   AND o.account_id    = a.id THEN  o.amount
+      WHEN o.type IN ('income','opening') AND o.account_id = a.id THEN  o.amount
       WHEN o.type = 'transfer' AND o.to_account_id = a.id THEN  COALESCE(o.to_amount, o.amount)
       WHEN o.type = 'expense'  AND o.account_id    = a.id THEN -o.amount
       WHEN o.type = 'transfer' AND o.account_id    = a.id THEN -o.amount

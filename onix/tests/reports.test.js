@@ -126,6 +126,24 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   const cfS = await R.cashFlow('2026-01-01', '2026-01-31', 'UZS');
   eq(cfS.expense.find(g => g.name === 'Yangiobod').total, 1_500_000, 'pul oqimida ham ko\'rindi');
 
+  console.log('\n─── BOSHLANG\'ICH QOLDIQ ───');
+  // Boshlang'ich qoldiq kassaga tushadi, lekin daromad emas —
+  // aks holda birinchi oy foydasi yolg'on chiqardi.
+  await db.addOperation({ type:'opening', account_id:naqdSum,
+    amount:12_500_000, currency:'UZS', paid_at:'2025-12-31', period:'2025-12-01', created_by:101 });
+
+  const plO = await R.profitLoss('2025-12-01', 'UZS');
+  eq(plO.revenue, 0, 'foyda-zararda daromad EMAS');
+  eq(plO.profit,  0, 'yolg\'on foyda yaratmaydi');
+
+  const cfDec = await R.cashFlow('2025-12-01', '2025-12-31', 'UZS');
+  eq(cfDec.incomeTotal,     0,          'pul oqimida kirim sifatida sanalmaydi');
+  eq(cfDec.openedInPeriod,  12_500_000, 'alohida qator sifatida ko\'rinadi');
+  eq(cfDec.closing,         12_500_000, 'yakuniy qoldiqqa qo\'shiladi');
+
+  const cfJanAfter = await R.cashFlow('2026-01-01', '2026-01-31', 'UZS');
+  eq(cfJanAfter.opening, 12_500_000, 'keyingi davrga boshlang\'ich qoldiq bo\'lib o\'tadi');
+
   console.log('\n─── KELGUSI OYGA YOZILGANLAR ───');
   const def = await R.deferred('UZS', JAN);
   eq(def.length, 1, 'bitta kelgusi davr yozuvi');

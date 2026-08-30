@@ -49,6 +49,12 @@ function cashFlow(cf) {
   L.push(LINE);
   L.push(row('Jami chiqim', f.signed(-cf.expenseTotal, c), c));
 
+  if (cf.openedInPeriod) {
+    L.push('');
+    L.push('⚖️ BOSHLANG\'ICH QOLDIQ');
+    L.push(row('Kiritildi', f.signed(cf.openedInPeriod, c), c, { indent: 1 }));
+  }
+
   if (cf.convIn || cf.convOut) {
     L.push('');
     L.push('🔄 VALYUTA KONVERTATSIYASI');
@@ -173,13 +179,13 @@ function podotchet(rows, currency, from, to) {
 
 // ================= Kassa daftari =================
 
-const TYPE_ICON = { income: '📥', expense: '📤', transfer: '🔄' };
+const TYPE_ICON = { income: '📥', expense: '📤', transfer: '🔄', opening: '⚖️' };
 
 function operationLine(o) {
   const icon = TYPE_ICON[o.type];
-  const what = o.type === 'transfer'
-    ? `${o.account_name} → ${o.to_account_name}`
-    : [o.group_name, o.cat_name, o.category_name].filter(Boolean).join(' · ');
+  const what = o.type === 'transfer' ? `${o.account_name} → ${o.to_account_name}`
+             : o.type === 'opening'  ? "Boshlang'ich qoldiq"
+             : [o.group_name, o.cat_name, o.category_name].filter(Boolean).join(' · ');
   const amount = o.type === 'expense' ? -Number(o.amount) : Number(o.amount);
 
   let line = `${icon} <b>${f.money(amount, o.currency)}</b> — ${f.esc(what)}\n` +
@@ -203,10 +209,14 @@ function book(ops, { from, to, page = 0, total = 0 } = {}) {
 
 function draft(d) {
   const L = [];
-  const title = { income: '📥 KIRIM', expense: '📤 CHIQIM', transfer: '🔄 O\'TKAZMA' }[d.type];
+  const title = { income: '📥 KIRIM', expense: '📤 CHIQIM',
+                  transfer: '🔄 O\'TKAZMA', opening: '⚖️ BOSHLANG\'ICH QOLDIQ' }[d.type];
 
   L.push(row('Summa', d.amount, d.currency));
-  if (d.type === 'transfer') {
+  if (d.type === 'opening') {
+    L.push(row('Hisob', d.accountName, d.currency));
+    L.push(row('Sana',  f.d(d.paidAt), d.currency));
+  } else if (d.type === 'transfer') {
     L.push(row('Qayerdan', d.accountName, d.currency));
     L.push(row('Qayerga',  d.toAccountName, d.currency));
     if (d.toAmount) L.push(row('Olinadi', f.money(d.toAmount, d.toCurrency), d.currency));

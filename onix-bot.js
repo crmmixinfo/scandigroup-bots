@@ -67,6 +67,15 @@ bot.use(async (ctx, next) => {
 
   // Username o'zgargan bo'lsa yangilab qo'yamiz
   if (ctx.from.username) await db.touchUsername(ctx.from.id, ctx.from.username);
+
+  // Super admin avtomat yozilganda ismi vaqtinchalik bo'ladi — haqiqiysiga almashtiramiz
+  if (ctx.user.full_name === 'Super admin') {
+    const real = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ');
+    if (real) {
+      await db.addUser(ctx.from.id, real, ctx.user.role, ctx.from.id, ctx.from.username);
+      ctx.user.full_name = real;
+    }
+  }
   return next();
 });
 
@@ -141,6 +150,7 @@ const STEPS = {
   expense:   ['account', 'group', 'cat', 'sub', 'amount', 'date', 'period', 'note', 'confirm'],
   podotchet: ['account', 'staff', 'amount', 'date', 'note', 'confirm'],
   convert:   ['account', 'toaccount', 'amount', 'toamount', 'date', 'note', 'confirm'],
+  opening:   ['account', 'amount', 'date', 'confirm'],
 };
 
 const TITLE = {
@@ -148,6 +158,7 @@ const TITLE = {
   expense:   '📤 Chiqim kiritish',
   podotchet: '👛 Hodimga hisobdor pul berish',
   convert:   "🔄 O'tkazma / valyuta konvertatsiyasi",
+  opening:   "⚖️ Boshlang'ich qoldiq kiritish",
 };
 
 async function startWizard(ctx, flow) {
@@ -183,6 +194,7 @@ async function ask(ctx) {
         expense:   '💸 Pul qaysi kassadan chiqdi?',
         podotchet: '💼 Qaysi kassadan berilsin?',
         convert:   '💼 Qaysi hisobdan?',
+        opening:   '⚖️ Qaysi kassaning qoldig\'ini kiritamiz?',
       }[w.flow];
       return ctx.reply(prompt, K.accounts(rows, 'acc', { showBalance: true }));
     }
@@ -220,10 +232,18 @@ async function ask(ctx) {
         { ...HTML, ...K.subCategories(rows) });
     }
 
-    case 'amount':
+    case 'amount': {
+      const unit = d.currency === 'UZS' ? "so'm" : 'dollar';
+      if (w.flow === 'opening') {
+        return ctx.reply(
+          `⚖️ <b>${f.esc(d.accountName)}</b> hisobida hozir qancha pul bor?\n\n` +
+          `Summani kiriting (<b>${unit}</b>):\n` +
+          `<i>Misol: 12 500 000  ·  12,5 mln</i>`, HTML);
+      }
       return ctx.reply(
-        `💵 Summani kiriting (<b>${d.currency === 'UZS' ? "so'm" : 'dollar'}</b>):\n\n` +
+        `💵 Summani kiriting (<b>${unit}</b>):\n\n` +
         `<i>Misol: 1 500 000  ·  1,5 mln  ·  250k</i>`, HTML);
+    }
 
     case 'toamount':
       // Bir xil valyuta — konvertatsiya yo'q, summa o'zgarmaydi
@@ -233,6 +253,13 @@ async function ask(ctx) {
         `<i>Kurs avtomatik hisoblanadi</i>`, HTML);
 
     case 'date':
+      if (w.flow === 'opening') {
+        return ctx.reply(
+          `📅 <b>Qaysi sanadagi qoldiq?</b>\n\n` +
+          `<i>Odatda — hisobni yuritishni boshlagan kuningiz.\n` +
+          `Shu sanadan keyingi barcha operatsiyalar shunga qo'shiladi.</i>`,
+          { ...HTML, ...K.payDate() });
+      }
       return ctx.reply("📅 To'lov sanasi — pul qachon real harakat qildi?", K.payDate());
 
     case 'period':
@@ -407,7 +434,7 @@ bot.action(/^dat:(.+)$/, async (ctx) => {
 // O'tkazmalarda P&L davri so'ralmaydi — to'lov oyiga tenglashtiriladi
 async function afterDate(ctx) {
   const w = wiz(ctx);
-  if (w.flow === 'podotchet' || w.flow === 'convert') {
+  if (w.flow !== 'income' && w.flow !== 'expense') {
     w.d.period = f.iso(new Date(w.d.paidAt.slice(0, 8) + '01'));
   }
   return advance(ctx);
@@ -781,7 +808,19 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<code>/del_cat &lt;id&gt;</code> — istalgan darajani yashiradi\n\n` +
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
-  `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>`, HTML));
+  `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>`,
+  { ...HTML, ...Markup.inlineKeyboard([
+      [Markup.button.callback("⚖️ Boshlang'ich qoldiq kiritish", 'openbal')],
+  ]) }));
+
+// Boshlang'ich qoldiq — tizim ishga tushgandagi kassadagi pul.
+// Daromad emas: foyda-zararga kirmaydi, pul oqimida alohida qator.
+bot.action('openbal', async (ctx) => {
+  await ctx.answerCbQuery();
+  if (!canEnterCash(ctx.user)) return;
+  ctx.session.r = null;
+  return startWizard(ctx, 'opening');
+});
 
 const adminOnly = (handler) => async (ctx) => {
   if (!isAdmin(ctx.user)) return ctx.reply('🔒 Faqat administrator uchun.');
