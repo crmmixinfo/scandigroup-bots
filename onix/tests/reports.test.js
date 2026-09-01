@@ -184,9 +184,8 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
      'kun ichidagi harakat qoldiqqa to\'g\'ri tushdi');
   ok(msgs.some(m => m.includes('KUNLIK HISOBOT') && m.includes('Kun boshida')),
      'hodim alohida xabarda, batafsil');
-  ok(msgs[msgs.length - 1].includes('QOLDIQLAR') &&
-     msgs[msgs.length - 1].includes('kun boshiga'),
-     'oxirgi xabar — kun boshiga qoldiqlar');
+  ok(!msgs.some(m => m.includes('QOLDIQLAR —')),
+     'alohida qoldiqlar xabari yo\'q — qoldiq har xabar ichida');
 
   // Pul oqimi va foyda-zarar bu yerga kirmasligi kerak
   const joined = msgs.join('\n');

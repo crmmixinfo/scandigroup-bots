@@ -339,7 +339,7 @@ qatorda `→ P&L: Fev 2026` belgisi bilan.
 Har kuni **soat 09:00** da **admin va rahbarlarga** kechagi kun bo'yicha
 yuboriladi. Hodimlar va kassirga yuborilmaydi.
 
-Har bo'lim **alohida xabar** bo'lib keladi — telefonda o'qish oson bo'lsin
+Ikki xil xabar keladi, har biri alohida — telefonda o'qish oson bo'lsin
 va kerakligini alohida uzatish mumkin bo'lsin:
 
 **1. 📋 KASSA** — kassaga kirgan va chiqqan pul, hodimlarga berilgani
@@ -401,20 +401,11 @@ SARFLANDI                −800 000 so'm
 KUN OXIRIDA             2 200 000 so'm
 ```
 
-**3. 💼 QOLDIQLAR — kun boshiga**
+Qoldiqlar har ikkala xabarning ichida turadi (kassa uchun kun boshi va
+kun oxiri, hodim uchun ham shunday), shuning uchun alohida «qoldiqlar»
+xabari yuborilmaydi.
 
-```
-💼 QOLDIQLAR — 01.09.2026 kun boshiga
-
-💵 Naqd (sum)           5 000 000 so'm
-💳 Plastik (sum)       43 800 000 so'm
-👛 Asadbek Abduqahhorov 2 200 000 so'm
-👛 Burxon (sum)         1 350 000 so'm
-──────────────────────────────────────
-JAMI                   52 350 000 so'm
-```
-
-Pul oqimi va foyda-zarar bu yerga **kirmaydi** — ular so'ralganda,
+Pul oqimi va foyda-zarar ham bu yerga **kirmaydi** — ular so'ralganda,
 📈 Hisobotlar bo'limida ko'riladi.
 
 ### Sozlash

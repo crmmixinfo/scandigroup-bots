@@ -3,12 +3,12 @@
 // Har kuni ertalab kechagi kun bo'yicha admin va rahbarlarga yuboriladi.
 // Uch xil xabar, har biri alohida:
 //
-//   1. 📋 KASSA          — kassaga kirgan/chiqqan pul, hodimlarga berilgani
-//   2. 👤 <Hodim>        — har bir hodim alohida: kun boshi → sarflagani → kun oxiri
-//   3. 💼 QOLDIQLAR      — bugun kun boshiga qolgan pul
+//   1. 📋 KASSA    — kun boshi, kirim/chiqim, hodimlarga berilgani, kun oxiri
+//   2. 👤 <Hodim>  — har bir hodim alohida: kun boshi → sarflagani → kun oxiri
 //
-// Pul oqimi va foyda-zarar bu yerga kirmaydi — ular hisobotlar bo'limida,
-// so'ralganda ko'riladi.
+// Qoldiqlar har ikkala xabarning ichida turadi, shuning uchun alohida
+// "qoldiqlar" xabari yo'q. Pul oqimi va foyda-zarar ham bu yerga kirmaydi —
+// ular hisobotlar bo'limida, so'ralganda ko'riladi.
 
 const db = require('./db');
 const R = require('./reports');
@@ -147,39 +147,9 @@ async function kassaSection(date, currency) {
   return `${V.curLabel(currency)}\n<pre>${f.esc(L.join('\n').trimEnd())}</pre>`;
 }
 
-// ---------- 3. Kun boshiga qoldiqlar ----------
-// Hisobot kechagi kun haqida, shuning uchun kecha kun oxiridagi qoldiq =
-// bugun kun boshidagi qoldiq. Rahbar ertalab shuni bilishi kerak.
-async function balancesSection(date) {
-  const parts = [];
-  for (const currency of ['UZS', 'USD']) {
-    const rows = await db.all(`
-      SELECT a.name, a.emoji, a.kind,
-             COALESCE((
-               SELECT SUM(delta) FROM (${R.MOVES_SQL} AND o.paid_at <= $2) m
-               WHERE m.account_id = a.id
-             ), 0) AS balance
-      FROM onix_accounts a
-      WHERE a.active AND a.currency = $1
-      ORDER BY a.sort_order, a.id`, [currency, date]);
-
-    const meaningful = rows.filter(r => Number(r.balance) !== 0);
-    if (!meaningful.length) continue;
-
-    const L = meaningful.map(r =>
-      V.row(`${r.emoji || '•'} ${r.name}`, Number(r.balance), currency));
-    L.push('─'.repeat(38));
-    L.push(V.row('JAMI', meaningful.reduce((a, r) => a + Number(r.balance), 0), currency));
-    parts.push(`${V.curLabel(currency)}\n<pre>${f.esc(L.join('\n'))}</pre>`);
-  }
-  return parts;
-}
-
 // ---------- To'liq hisobot ----------
 async function build(date) {
   const messages = [];
-  const next = new Date(date + 'T00:00:00');
-  next.setDate(next.getDate() + 1);
 
   // 1. Kassa
   const kassaParts = [];
@@ -198,13 +168,6 @@ async function build(date) {
       const text = V.staffDay([s], date, currency, s.full_name);
       messages.push(text.length > LIMIT ? text.slice(0, LIMIT) : text);
     }
-  }
-
-  // 3. Kun boshiga qoldiqlar
-  const balances = await balancesSection(date);
-  if (balances.length) {
-    messages.push(
-      `<b>💼 QOLDIQLAR — ${f.d(f.iso(next))} kun boshiga</b>\n\n${balances.join('\n')}`);
   }
 
   return messages;
