@@ -121,12 +121,14 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   await cb(`cat:${xomAsh}`, 201);
   await cb(`sub:${ozOvqat}`, 201);
   await msg('3 mln', 201);
-  await cb('dat:2026-03-07', 201);
+  // Hodimdan sana so'ralmaydi — avtomat bugun qo'yiladi
   await cb('per:2026-03-01', 201);
   sent = []; await msg('Bozordan sabzavot', 201);
   await cb('save', 201);
   const op3 = await db.getOperation(3);
   eq(op3.type, 'expense', 'xarajat');
+  eq(op3.paid_at.toISOString().slice(0, 10), require('../format').iso(new Date()),
+     'hodimning yozuvi bugungi sana bilan');
   eq(op3.account_id, aliSum, 'hodim podotchyotidan');
   eq(op3.note, 'Bozordan sabzavot', 'izoh saqlandi');
 
@@ -254,8 +256,8 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   await cb('rcur:UZS', 301);
   await cb('rng:pick', 301);
   await cb('rrange:2026-03-01', 301);
-  ok(sent.some(s => s.text && s.text.includes('PUL OQIMI') && s.text.includes('35 500 000')),
-     'mart pul oqimi: 40 − 3 − 1,5 = 35,5 mln sof oqim');
+  ok(sent.some(s => s.text && s.text.includes('PUL OQIMI') && s.text.includes('38 500 000')),
+     'mart pul oqimi: 40 − 1,5 = 38,5 mln (hodim yozuvi bugunga tushgan)');
   ok(sent.some(s => s.text && s.text.includes('Yangiobod')),
      'podkategoriyasiz guruh pul oqimida ko\'rindi');
 
@@ -306,6 +308,53 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   // Hodim o'zi kirita olmasin
   sent = []; await cb('openbal', 201);
   ok(!sent.some(x => x.text && /qaysi hisobning qoldig/i.test(x.text)), 'hodimga ruxsat berilmadi');
+
+  // ═══ 10. HODIM FAQAT BUGUNGI KUN BILAN KIRITADI ═══
+  console.log('\n─── Hodim uchun sana cheklovi ───');
+  const f2 = require('../format');
+  const TODAY = f2.iso(new Date());
+  const THIS_PERIOD = TODAY.slice(0, 8) + '01';
+
+  await msg(K.MENU.myExpense, 201);
+  await cb(`acc:${aliSum}`, 201);
+  await cb(`grp:${grEx}`, 201);
+  await cb(`cat:${xomAsh}`, 201);
+  await cb(`sub:${ozOvqat}`, 201);
+  sent = []; await msg('500 000', 201);
+  ok(sent.some(x => x.text && x.text.includes('(bugun)')), 'sana avtomat bugun qo\'yildi');
+  ok(!sent.some(x => x.text && x.text.includes('Kecha')), 'sana tanlash tugmalari ko\'rsatilmadi');
+
+  // Soxta tugma bilan eski sana yuborish
+  sent = []; await cb('dat:2026-01-01', 201);
+  ok(!sent.some(x => x.text && x.text.includes('01.01.2026')), 'eski sana rad etildi');
+
+  await cb(`per:${THIS_PERIOD}`, 201);
+  await cb('note:skip', 201);
+  await cb('save', 201);
+  const lastOp = await db.one('SELECT paid_at FROM onix_operations ORDER BY id DESC LIMIT 1');
+  eq(lastOp.paid_at.toISOString().slice(0, 10), TODAY, 'yozuv bugungi sana bilan saqlandi');
+
+  // Kassir esa istalgan sanani tanlay oladi
+  await msg(K.MENU.expense, 101);
+  await cb(`acc:${naqdSum}`, 101);
+  sent = []; await cb(`grp:${grEx}`, 101);
+  await cb(`cat:${xomAsh}`, 101);
+  await cb(`sub:${ozOvqat}`, 101);
+  sent = []; await msg('100 000', 101);
+  ok(sent.some(x => x.text && x.text.includes("To'lov sanasi")), 'kassirdan sana so\'raldi');
+  await cb('cancel', 101);
+
+  // ═══ 11. HODIMNING KUNLIK BATAFSIL HISOBOTI ═══
+  console.log('\n─── /hodim ───');
+  sent = []; await msg('/hodim', 101);
+  ok(sent.some(x => x.text && x.text.includes('ochiq emas')), 'kassirga ochiq emas');
+
+  sent = []; await msg('/hodim', 301);
+  const rep = sent.map(x => x.text || '').join('\n');
+  ok(rep.includes('KUNLIK HISOBOT'), 'rahbar ko\'rdi');
+  ok(rep.includes('Kun boshida'), 'kun boshidagi qoldiq bor');
+  ok(rep.includes('SARFLANDI'), 'sarflangani bor');
+  ok(rep.includes('KUN OXIRIDA'), 'kun oxiri bor');
 
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();

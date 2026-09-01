@@ -32,7 +32,7 @@ va sanalar mos kelmasa tasdiq ekranida ogohlantiradi.
 | Rol | Nima qiladi | Nima ko'radi |
 |---|---|---|
 | `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Barcha kassa qoldiqlari, kassa daftari |
-| `staff` | **Faqat o'z qo'lidagi puldan** xarajat kiritadi | **Faqat o'zi kiritgan yozuvlar** va o'z qoldig'i |
+| `staff` | **Faqat o'z qo'lidagi puldan**, **faqat bugungi kun bilan** | **Faqat o'zi kiritgan yozuvlar** va o'z qoldig'i |
 | `manager` | Hech nima kiritmaydi | **Hammasini** — barcha hisobotlar, qoldiqlar, daftar |
 | `admin` | Hammasi | Hammasi + sozlamalar |
 
@@ -52,6 +52,19 @@ Cheklov faqat tugmalarni yashirish bilan emas — **serverda** tekshiriladi:
 - soxta tugma yuborib boshqa hisobni tanlab bo'lmaydi — hodim faqat o'z
   podotchyot hisobidan sarflay oladi, kompaniya kassasidan emas;
 - hisobot callback'ini qo'lda yuborsa hech narsa qaytmaydi.
+
+### Hodim faqat bugungi kun bilan kiritadi
+
+Kechagi xarajatni ertaga yozib qo'yish kassa daftarini chalkashtiradi va
+nazoratni yo'qotadi. Shuning uchun hodimdan sana **umuman so'ralmaydi** —
+avtomat bugun qo'yiladi:
+
+```
+📅 Sana: 01.09.2026 (bugun)
+```
+
+Bu bir qadamni ham tejaydi. Soxta tugma yoki qo'lda yozilgan sana ham rad
+etiladi. Kassir va admin esa avvalgidek istalgan sanani tanlaydi.
 
 Bularning har biri testlar bilan qoplangan.
 
@@ -362,7 +375,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (120 ta tekshiruv)
+onix/tests/          testlar (132 ta tekshiruv)
 ```
 
 ## 13. Testlar

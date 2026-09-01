@@ -174,6 +174,71 @@ async function podotchetReport(from, to, currency) {
   return staff;
 }
 
+// ---------- Hodimning bir kunlik batafsil hisoboti ----------
+// Kun boshida qancha bor edi → kimdan qancha oldi → nimaga sarfladi →
+// qancha qaytardi → kun oxirida qancha qoldi.
+async function staffDay(date, currency) {
+  const prev = new Date(date + 'T00:00:00');
+  prev.setDate(prev.getDate() - 1);
+  const dayBefore = require('./format').iso(prev);
+
+  const staff = await db.all(`
+    SELECT u.tg_id, u.full_name, a.id AS account_id
+    FROM onix_users u
+    JOIN onix_accounts a ON a.owner_tg_id = u.tg_id AND a.kind = 'podotchet' AND a.active
+    WHERE u.active AND u.role = 'staff' AND a.currency = $1
+    ORDER BY u.full_name`, [currency]);
+
+  for (const s of staff) {
+    const balanceAt = async (upTo) => Number((await db.one(
+      `SELECT COALESCE(SUM(delta), 0) AS total
+       FROM (${MOVES} AND o.paid_at <= $2) m WHERE m.account_id = $1`,
+      [s.account_id, upTo])).total);
+
+    s.opening = await balanceAt(dayBefore);
+    s.closing = await balanceAt(date);
+
+    // Kimdan oldi
+    s.received = await db.all(`
+      SELECT src.name AS from_name, COALESCE(o.to_amount, o.amount) AS amount, o.note
+      FROM onix_operations o
+      JOIN onix_accounts src ON src.id = o.account_id
+      WHERE o.deleted_at IS NULL AND o.type = 'transfer'
+        AND o.to_account_id = $1 AND o.paid_at = $2
+      ORDER BY o.id`, [s.account_id, date]);
+
+    // Nimaga sarfladi
+    s.spent = await db.all(`
+      SELECT o.amount, o.note,
+             COALESCE(g.name, p.name) AS group_name,
+             CASE WHEN g.id IS NOT NULL THEN p.name ELSE n.name END AS cat_name,
+             CASE WHEN g.id IS NOT NULL THEN n.name END AS sub_name
+      FROM onix_operations o
+      JOIN onix_categories n ON n.id = o.category_id
+      LEFT JOIN onix_categories p  ON p.id = n.parent_id
+      LEFT JOIN onix_categories g  ON g.id = p.parent_id
+      WHERE o.deleted_at IS NULL AND o.type = 'expense'
+        AND o.account_id = $1 AND o.paid_at = $2
+      ORDER BY o.amount DESC`, [s.account_id, date]);
+
+    // Qaytargani (kassaga qaytarish)
+    s.returned = await db.all(`
+      SELECT dst.name AS to_name, o.amount
+      FROM onix_operations o
+      JOIN onix_accounts dst ON dst.id = o.to_account_id
+      WHERE o.deleted_at IS NULL AND o.type = 'transfer'
+        AND o.account_id = $1 AND o.paid_at = $2
+      ORDER BY o.id`, [s.account_id, date]);
+
+    s.receivedTotal = s.received.reduce((a, r) => a + Number(r.amount), 0);
+    s.spentTotal    = s.spent.reduce((a, r) => a + Number(r.amount), 0);
+    s.returnedTotal = s.returned.reduce((a, r) => a + Number(r.amount), 0);
+    s.active = !!(s.opening || s.closing || s.receivedTotal || s.spentTotal || s.returnedTotal);
+  }
+
+  return staff;
+}
+
 // ---------- Hodim kesimida xarajat ----------
 async function byAuthor(from, to, currency) {
   return db.all(`
@@ -244,5 +309,5 @@ function prevMonth(period) {
 
 module.exports = {
   openingBalance, cashFlow, profitLoss, profitLossCompare,
-  podotchetReport, byAuthor, deferred, prevMonth,
+  podotchetReport, staffDay, byAuthor, deferred, prevMonth,
 };

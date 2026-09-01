@@ -255,6 +255,14 @@ async function ask(ctx) {
         `<i>Kurs avtomatik hisoblanadi</i>`, HTML);
 
     case 'date':
+      // Hodim faqat bugungi kun bilan kiritadi: kechagi xarajatni ertaga
+      // yozib qo'yish kassa daftarini chalkashtiradi va nazoratni yo'qotadi.
+      // Shu sababli undan sana so'ralmaydi — avtomat bugun.
+      if (canEnterOwn(ctx.user)) {
+        d.paidAt = f.iso(new Date());
+        await ctx.reply(`📅 Sana: <b>${f.d(d.paidAt)}</b> (bugun)`, HTML);
+        return afterDate(ctx);
+      }
       if (w.flow === 'opening') {
         return ctx.reply(
           `📅 <b>Qaysi sanadagi qoldiq?</b>\n\n` +
@@ -427,6 +435,11 @@ back('back:grp', 'cat');    // kategoriyadan guruhga
 bot.action(/^dat:(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   if (!at(ctx, 'date')) return;
+  // Hodimga bugungi kundan boshqa sana yo'q — tugma ko'rsatilmaydi,
+  // qo'lda yuborilsa ham rad etiladi
+  if (canEnterOwn(ctx.user) && ctx.match[1] !== f.iso(new Date())) {
+    return ctx.answerCbQuery('Faqat bugungi kun bilan kiritiladi', { show_alert: true }).catch(() => {});
+  }
   if (ctx.match[1] === 'manual') {
     wiz(ctx).awaitDate = true;
     return ctx.editMessageText('✏️ Sanani yozing: <code>05.02.2026</code> yoki <code>05.02</code>', HTML);
@@ -579,6 +592,9 @@ bot.on('text', async (ctx, next) => {
   if (step === 'date' && w.awaitDate) {
     const date = f.parseDate(text);
     if (!date) return ctx.reply("❌ Sana noto'g'ri. Misol: <code>05.02.2026</code>", HTML);
+    if (canEnterOwn(ctx.user) && date !== f.iso(new Date())) {
+      return ctx.reply('⚠️ Siz faqat <b>bugungi kun</b> bilan kirita olasiz.', HTML);
+    }
     w.awaitDate = false;
     d.paidAt = date;
     await ctx.reply(`✅ To'lov sanasi: <b>${f.d(date)}</b>`, HTML);
@@ -758,6 +774,12 @@ async function renderRange(ctx, from, to) {
   }
 
   if (r.kind === 'pod') {
+    // Bitta kun so'ralganda batafsil ko'rinish: kun boshi → olindi →
+    // sarflandi → kun oxiri. Uzunroq davrda qisqa jamlanma yetarli.
+    if (from === to) {
+      const rows = await R.staffDay(from, r.currency);
+      return ctx.editMessageText(V.staffDay(rows, from, r.currency), HTML);
+    }
     const rows = await R.podotchetReport(from, to, r.currency);
     return ctx.editMessageText(V.podotchet(rows, r.currency, from, to), HTML);
   }
@@ -827,7 +849,8 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<b>Kunlik hisobot</b>\n` +
   `Har kuni soat ${DAILY_TIME} da admin va rahbarlarga avtomat yuboriladi.\n` +
   `<code>/kunlik</code> — hozir ko'rish (kechagi kun)\n` +
-  `<code>/kunlik 29.08.2026</code> — tanlangan kun`,
+  `<code>/kunlik 29.08.2026</code> — tanlangan kun\n` +
+  `<code>/hodim [sana]</code> — hodimlarning kunlik batafsili`,
   { ...HTML, ...Markup.inlineKeyboard([
       [Markup.button.callback("⚖️ Boshlang'ich qoldiq kiritish", 'openbal')],
   ]) }));
@@ -1106,6 +1129,20 @@ async function checkDailyReport() {
     console.error('Kunlik hisobot xatosi:', err.message);
   }
 }
+
+// Hodimlarning kunlik batafsil hisoboti
+bot.command('hodim', async (ctx) => {
+  if (!canReport(ctx.user)) return ctx.reply('🔒 Bu bo\'lim sizga ochiq emas.');
+  const [arg] = args(ctx);
+  const date = arg ? f.parseDate(arg) : f.iso(new Date());
+  if (!date) return ctx.reply('Foydalanish: <code>/hodim</code> yoki <code>/hodim 29.08.2026</code>', HTML);
+
+  for (const currency of ['UZS', 'USD']) {
+    const rows = await R.staffDay(date, currency);
+    if (!rows.some(r => r.active)) continue;
+    await ctx.reply(V.staffDay(rows, date, currency), HTML);
+  }
+});
 
 // Qo'lda chaqirish — tekshirib ko'rish uchun
 bot.command('kunlik', async (ctx) => {

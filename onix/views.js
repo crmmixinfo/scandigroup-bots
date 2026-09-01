@@ -177,6 +177,57 @@ function podotchet(rows, currency, from, to) {
          `<pre>${f.esc(L.join('\n'))}</pre>`;
 }
 
+// ================= Hodimning bir kunlik hisoboti =================
+
+function staffDay(rows, date, currency) {
+  const active = rows.filter(r => r.active);
+  if (!active.length) {
+    return `<b>👤 HODIMLAR — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
+           `<i>Bu kuni hodimlarda harakat bo'lmagan.</i>`;
+  }
+
+  const blocks = active.map((s) => {
+    const L = [];
+    L.push(row('Kun boshida', s.opening, currency));
+
+    if (s.received.length) {
+      L.push('');
+      L.push(row('OLINDI', f.signed(s.receivedTotal, currency), currency));
+      for (const r of s.received) {
+        L.push(row(`← ${r.from_name}`, Number(r.amount), currency, { indent: 2 }));
+        if (r.note) L.push(`     ${r.note}`);
+      }
+    }
+
+    if (s.spent.length) {
+      L.push('');
+      L.push(row('SARFLANDI', f.signed(-s.spentTotal, currency), currency));
+      for (const e of s.spent) {
+        L.push(row(`· ${e.sub_name || e.cat_name}`, Number(e.amount), currency, { indent: 2 }));
+        const where = [e.group_name, e.sub_name ? e.cat_name : null].filter(Boolean).join(' › ');
+        if (where) L.push(`       ${where}`);
+        if (e.note) L.push(`       💬 ${e.note}`);
+      }
+    }
+
+    if (s.returned.length) {
+      L.push('');
+      L.push(row('QAYTARDI', f.signed(-s.returnedTotal, currency), currency));
+      for (const r of s.returned) L.push(row(`→ ${r.to_name}`, Number(r.amount), currency, { indent: 2 }));
+    }
+
+    L.push('─'.repeat(W));
+    L.push(row('KUN OXIRIDA', s.closing, currency));
+
+    return `<b>👤 ${f.esc(s.full_name)}</b>\n<pre>${f.esc(L.join('\n'))}</pre>`;
+  });
+
+  const total = active.reduce((a, s) => a + s.closing, 0);
+  return `<b>👤 HODIMLAR — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
+         blocks.join('\n') +
+         `\n<b>Jami qo'lda: ${f.money(total, currency)}</b>`;
+}
+
 // ================= Kassa daftari =================
 
 const TYPE_ICON = { income: '📥', expense: '📤', transfer: '🔄', opening: '⚖️' };
@@ -245,5 +296,5 @@ function draft(d) {
 }
 
 module.exports = {
-  row, cashFlow, profitLoss, balances, podotchet, book, operationLine, draft, curLabel,
+  row, cashFlow, profitLoss, balances, podotchet, staffDay, book, operationLine, draft, curLabel,
 };

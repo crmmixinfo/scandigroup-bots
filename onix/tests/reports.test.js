@@ -174,7 +174,9 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   ok(msgs[0].includes('KUNLIK HISOBOT'), 'sarlavha bor');
   ok(msgs[0].includes('12.01.2026'), 'sana to\'g\'ri');
   ok(msgs.some(m => m.includes('Oziq-ovqat')), 'o\'sha kungi operatsiya ro\'yxatda');
-  ok(msgs.some(m => m.includes("qo'lidagi pul")), 'podotchyot bo\'limi bor');
+  ok(msgs.some(m => m.includes('HODIMLAR — KUNLIK HISOBOT')), 'hodimlar bo\'limi bor');
+  ok(msgs.some(m => m.includes('Kun boshida') && m.includes('KUN OXIRIDA')),
+     'hodim bo\'limi batafsil: kun boshi va kun oxiri');
   ok(!msgs.some(m => m.includes('Ijara haqi')), 'boshqa kunning yozuvi kirmadi');
 
   // Harakatsiz kun

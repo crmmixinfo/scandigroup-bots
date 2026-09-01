@@ -77,20 +77,18 @@ async function build(date) {
     if (buf.trim()) messages.push(buf);
   }
 
-  // ---------- 3. Podotchyot qoldiqlar ----------
-  const podParts = [];
+  // ---------- 3. Hodimlar bo'yicha batafsil ----------
+  // Qisqa jamlanma o'rniga to'liq manzara: kun boshida qancha bor edi,
+  // kimdan qancha oldi, nimaga sarfladi, kun oxirida qancha qoldi.
   for (const currency of ['UZS', 'USD']) {
-    const rows = await R.podotchetReport(date, date, currency);
-    const meaningful = rows.filter(r => r.balance || r.received || r.spent);
-    if (!meaningful.length) continue;
-    const L = meaningful.map(s =>
-      V.row(f.shortName(s.full_name), s.balance, currency));
-    L.push('─'.repeat(38));
-    L.push(V.row("JAMI QO'LDA", meaningful.reduce((a, s) => a + s.balance, 0), currency));
-    podParts.push(`${V.curLabel(currency)}\n<pre>${f.esc(L.join('\n'))}</pre>`);
-  }
-  if (podParts.length) {
-    messages.push(`<b>👛 Hodimlar qo'lidagi pul</b>\n\n${podParts.join('\n')}`);
+    const rows = await R.staffDay(date, currency);
+    if (!rows.some(r => r.active)) continue;
+    const text = V.staffDay(rows, date, currency);
+    if (text.length <= LIMIT) { messages.push(text); continue; }
+    // Uzun bo'lsa hodimlarga bo'lib yuboramiz
+    for (const s of rows.filter(r => r.active)) {
+      messages.push(V.staffDay([s], date, currency));
+    }
   }
 
   return messages;
