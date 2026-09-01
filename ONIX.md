@@ -336,14 +336,71 @@ qatorda `→ P&L: Fev 2026` belgisi bilan.
 
 ## 9. Kunlik avtomat hisobot
 
-Har kuni **soat 09:00** da admin va rahbarlarga **kechagi kun** bo'yicha
-hisobot yuboriladi — Telegram xabari, uch qismda:
+Har kuni **soat 09:00** da **admin va rahbarlarga** kechagi kun bo'yicha
+yuboriladi. Hodimlar va kassirga yuborilmaydi.
 
-1. **Kun yakuni** — kirim, chiqim, sof oqim, kun oxiridagi kassa qoldiqlari
-2. **Operatsiyalar ro'yxati** — kim, qaysi kategoriyaga, qancha kiritgani
-3. **Hodimlar bo'yicha batafsil** — yuqoridagi ko'rinishda
+Har bo'lim **alohida xabar** bo'lib keladi — telefonda o'qish oson bo'lsin
+va kerakligini alohida uzatish mumkin bo'lsin:
 
-Hodimlar va kassirga yuborilmaydi.
+**1. 📋 KASSA** — kassaga kirgan va chiqqan pul, hodimlarga berilgani
+
+```
+📋 KASSA
+📅 31.08.2026, dushanba
+
+📥 KIRIM
+ · mijoz nomi          18 000 000 so'm
+      Onix bussines center › Ijara to'lovi
+      Plastik (sum) · Mijoz A
+Jami kirim            +23 000 000 so'm
+
+📤 CHIQIM
+ · Elektr energiya      4 200 000 so'm
+      Onix xarajatlar uchun › Komunal to'lovlar
+      Plastik (sum)
+Jami chiqim           −12 200 000 so'm
+
+👛 HODIMLARGA BERILDI
+ · Asadbek Abduqahhorov 3 000 000 so'm
+      Naqd (sum) dan · Xo'jalik uchun
+Jami berildi           −4 500 000 so'm
+```
+
+**2. 👤 Har bir hodim — alohida xabar**
+
+```
+👤 ASADBEK ABDUQAHHOROV — KUNLIK HISOBOT
+📅 31.08.2026 · 🇺🇿 so'm
+
+Kun boshida                     0 so'm
+
+OLINDI                 +3 000 000 so'm
+  ← Naqd (sum)          3 000 000 so'm
+     Xo'jalik uchun
+
+SARFLANDI                −800 000 so'm
+  · Salfetka              420 000 so'm
+       Onix xarajatlar uchun › Xo'jalik xarajatlari
+       💬 Metrodan
+──────────────────────────────────────
+KUN OXIRIDA             2 200 000 so'm
+```
+
+**3. 💼 QOLDIQLAR — kun boshiga**
+
+```
+💼 QOLDIQLAR — 01.09.2026 kun boshiga
+
+💵 Naqd (sum)           5 000 000 so'm
+💳 Plastik (sum)       43 800 000 so'm
+👛 Asadbek Abduqahhorov 2 200 000 so'm
+👛 Burxon (sum)         1 350 000 so'm
+──────────────────────────────────────
+JAMI                   52 350 000 so'm
+```
+
+Pul oqimi va foyda-zarar bu yerga **kirmaydi** — ular so'ralganda,
+📈 Hisobotlar bo'limida ko'riladi.
 
 ### Sozlash
 
@@ -365,7 +422,7 @@ ketmaydi.
 ### Qo'lda ko'rish
 
 ```
-/kunlik                 — kechagi kun yakuni
+/kunlik                 — kechagi kun
 /kunlik 29.08.2026      — tanlangan kun
 /hodim                  — hodimlarning bugungi batafsili
 /hodim 29.08.2026       — tanlangan kun
@@ -492,7 +549,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (153 ta tekshiruv)
+onix/tests/          testlar (155 ta tekshiruv)
 ```
 
 ## 14. Testlar

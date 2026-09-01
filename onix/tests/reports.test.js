@@ -170,19 +170,32 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   const daily = require('../daily');
 
   const msgs = await daily.build('2026-01-12');   // Ali oziq-ovqat sotib olgan kun
-  ok(msgs.length >= 1, 'hisobot tuzildi');
-  ok(msgs[0].includes('KUNLIK HISOBOT'), 'sarlavha bor');
+  ok(msgs.length >= 2, 'bir necha alohida xabar');
+  ok(msgs[0].includes('KASSA'), '1-xabar — kassa');
   ok(msgs[0].includes('12.01.2026'), 'sana to\'g\'ri');
-  ok(msgs.some(m => m.includes('Oziq-ovqat')), 'o\'sha kungi operatsiya ro\'yxatda');
-  ok(msgs.some(m => m.includes('HODIMLAR — KUNLIK HISOBOT')), 'hodimlar bo\'limi bor');
-  ok(msgs.some(m => m.includes('Kun boshida') && m.includes('KUN OXIRIDA')),
-     'hodim bo\'limi batafsil: kun boshi va kun oxiri');
-  ok(!msgs.some(m => m.includes('Ijara haqi')), 'boshqa kunning yozuvi kirmadi');
+  ok(msgs.some(m => m.includes('KUNLIK HISOBOT') && m.includes('Kun boshida')),
+     'hodim alohida xabarda, batafsil');
+  ok(msgs[msgs.length - 1].includes('QOLDIQLAR') &&
+     msgs[msgs.length - 1].includes('kun boshiga'),
+     'oxirgi xabar — kun boshiga qoldiqlar');
+
+  // Pul oqimi va foyda-zarar bu yerga kirmasligi kerak
+  const joined = msgs.join('\n');
+  ok(!joined.includes('PUL OQIMI'), 'pul oqimi kirmadi');
+  ok(!joined.includes('FOYDA-ZARAR'), 'foyda-zarar kirmadi');
+  ok(!joined.includes('Rentabellik'), 'rentabellik kirmadi');
+
+  // Har hodim alohida xabarda — bittasida ikkalasi bo'lmasin
+  const staffMsgs = msgs.filter(m => m.includes('Kun boshida'));
+  for (const m of staffMsgs) {
+    const names = ['Ali Valiyev', 'Vali Aliyev'].filter(n => m.includes(n));
+    ok(names.length <= 1, 'bitta xabarda bitta hodim');
+  }
 
   // Harakatsiz kun
   const quiet = await daily.build('2026-01-02');
-  ok(quiet[0].includes('KUNLIK HISOBOT'), 'harakatsiz kunda ham hisobot keladi');
-  ok(quiet.length === 1, 'harakatsiz kunda ortiqcha xabar yo\'q');
+  ok(quiet[0].includes('KASSA'), 'harakatsiz kunda ham kassa xabari keladi');
+  ok(!quiet.some(m => m.includes('Kun boshida')), 'harakatsiz kunda hodim xabari yo\'q');
 
   // Kimga ketadi — faqat admin va rahbar
   await db.addUser(301, 'Sardor Rahbar', 'manager', 101);

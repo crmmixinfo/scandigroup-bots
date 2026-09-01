@@ -317,6 +317,7 @@ function prevMonth(period) {
 }
 
 module.exports = {
+  MOVES_SQL: MOVES,
   openingBalance, cashFlow, profitLoss, profitLossCompare,
   podotchetReport, staffDay, listStaff, byAuthor, deferred, prevMonth,
 };
