@@ -15,7 +15,8 @@ const MENU = {
   myBalance:'👛 Qo\'limdagi qoldiq',
   myOps:    '📋 Mening operatsiyalarim',
   myReport: '📊 Mening hisobotim',
-  reports:  '📊 Hisobotlar',
+  balance:  "📊 Kassa qoldig'i",
+  reports:  '📈 Hisobotlar',
   settings: '⚙️ Sozlamalar',
 };
 
@@ -23,11 +24,13 @@ const LAYOUT = {
   admin: [
     [MENU.income, MENU.expense],
     [MENU.podotchet, MENU.transfer],
-    [MENU.reports, MENU.settings],
+    [MENU.balance, MENU.reports],
+    [MENU.settings],
   ],
   cashier: [
     [MENU.income, MENU.expense],
     [MENU.podotchet, MENU.transfer],
+    [MENU.balance],
   ],
   staff: [
     [MENU.myExpense],
@@ -35,7 +38,7 @@ const LAYOUT = {
     [MENU.myOps],
   ],
   manager: [
-    [MENU.reports],
+    [MENU.balance, MENU.reports],
   ],
 };
 
@@ -44,7 +47,6 @@ const REPORTS = [
   { key: 'cf',    label: '💹 Pul oqimi' },
   { key: 'pl',    label: '📈 Foyda-zarar' },
   { key: 'staff', label: '👤 Hodimlar' },
-  { key: 'bal',   label: "📊 Kassa qoldig'i" },
   { key: 'book',  label: '📋 Kassa daftari' },
 ];
 

@@ -219,8 +219,9 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg(K.MENU.reports, 201);
   ok(last().includes('ochiq emas'), 'hodimga hisobotlar bo\'limi yopiq');
   ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'kompaniya kassalari ko\'rinmadi');
-  sent = []; await cb('rep:bal', 201);
-  ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'soxta so\'rov bilan ham ko\'ra olmadi');
+  sent = []; await msg(K.MENU.balance, 201);
+  ok(last().includes('ochiq emas'), 'hodimga kassa qoldig\'i yopiq');
+  ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'kompaniya kassalari ko\'rinmadi');
 
   // O'z qoldig'ini esa ko'radi
   sent = []; await msg(K.MENU.myBalance, 201);
@@ -406,6 +407,18 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await cb('rng:today', 301);
   const oneStaff = sent.map(x => x.text || '').join('\n');
   ok(!oneStaff.includes('Vali Aliyev'), 'faqat tanlangan hodim chiqdi');
+
+  // ═══ 14. KASSA QOLDIG'I — ASOSIY MENYUDA ═══
+  console.log('\n─── Kassa qoldig\'i asosiy menyuda ───');
+  for (const [id, role] of [[1, 'admin'], [301, 'rahbar'], [101, 'kassir']]) {
+    sent = []; await msg(K.MENU.balance, id);
+    ok(sent.some(x => x.text && x.text.includes("KASSA QOLDIG'I")), `${role} bir bosishda ko'rdi`);
+  }
+
+  kb = null; await msg(K.MENU.reports, 301);
+  const repList = (kb || []).flat().map(b => b.text).join(' ');
+  ok(!repList.includes("Kassa qoldig'i"), 'hisobotlar ichida endi yo\'q');
+  ok(repList.includes('Kassa daftari'), 'daftar hisobotlarda qoldi');
 
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();

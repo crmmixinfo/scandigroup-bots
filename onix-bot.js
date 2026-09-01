@@ -662,6 +662,13 @@ menu(K.MENU.myOps, canEnterOwn, (ctx) => {
 
 // ---------- 📊 Hisobotlar bo'limi ----------
 
+// Kassa qoldig'i — eng ko'p kerak bo'ladigan ma'lumot, shuning uchun
+// hisobotlar ichida emas, asosiy menyuda turadi
+menu(K.MENU.balance, canSeeAllBalances, async (ctx) => {
+  ctx.session.r = null;
+  return ctx.reply(V.balances(await db.balances()), HTML);
+});
+
 menu(K.MENU.reports, canReport, (ctx) => {
   ctx.session.r = null;
   return ctx.reply('📊 <b>Hisobotlar</b>\n\nQaysi hisobot kerak?',
@@ -679,18 +686,12 @@ menu(K.MENU.myReport, canEnterOwn, (ctx) => {
 });
 
 // Hisobot turi tanlandi
-bot.action(/^rep:(cf|pl|staff|bal|book)$/, async (ctx) => {
+bot.action(/^rep:(cf|pl|staff|book)$/, async (ctx) => {
   await ctx.answerCbQuery();
   if (!canReport(ctx.user)) {
     return ctx.answerCbQuery("Bu bo'lim sizga ochiq emas", { show_alert: true }).catch(() => {});
   }
   const kind = ctx.match[1];
-
-  // Kassa qoldig'i — davr so'ralmaydi, hozirgi holat
-  if (kind === 'bal') {
-    ctx.session.r = null;
-    return ctx.editMessageText(V.balances(await db.balances()), HTML);
-  }
 
   ctx.session.r = { kind: kind === 'staff' ? 'pod' : kind, daily: kind === 'staff' };
 

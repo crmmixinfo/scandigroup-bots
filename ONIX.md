@@ -31,7 +31,7 @@ va sanalar mos kelmasa tasdiq ekranida ogohlantiradi.
 
 | Rol | Nima qiladi | Nima ko'radi |
 |---|---|---|
-| `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Kiritish paytidagi kassa qoldiqlari |
+| `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Kassa qoldiqlari |
 | `staff` | **Faqat o'z qo'lidagi puldan**, **faqat bugungi kun bilan** | **Faqat o'ziniki** — kunlik hisoboti, qoldig'i, yozuvlari |
 | `manager` | Hech nima kiritmaydi | **Hammasini** — barcha hisobotlar, qoldiqlar, daftar |
 | `admin` | Hammasi | Hammasi + sozlamalar |
@@ -241,13 +241,16 @@ izsiz yo'qolmaydi.
 
 ## 8. Hisobotlar
 
-Barcha hisobotlar bitta **📊 Hisobotlar** tugmasi ostida:
+**📊 Kassa qoldig'i** — asosiy menyuda, bir bosishda. Eng ko'p kerak
+bo'ladigan ma'lumot bo'lgani uchun hisobotlar ichiga yashirilmagan.
+Admin, kassir va rahbar ko'radi.
+
+Qolgan hisobotlar **📈 Hisobotlar** tugmasi ostida:
 
 ```
 💹 Pul oqimi          — pul qachon harakat qilgani bo'yicha
 📈 Foyda-zarar        — xarajat qaysi oyga tegishli bo'lgani bo'yicha
 👤 Hodimlar           — kunlik batafsil
-📊 Kassa qoldig'i     — hozirgi holat
 📋 Kassa daftari      — barcha yozuvlar
 ```
 
@@ -489,7 +492,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (147 ta tekshiruv)
+onix/tests/          testlar (153 ta tekshiruv)
 ```
 
 ## 14. Testlar
