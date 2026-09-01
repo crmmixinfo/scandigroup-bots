@@ -181,6 +181,10 @@ Qayta yuklash xavfsiz: mavjudlari takrorlanmaydi, faqat yangilari qo'shiladi.
 Kategoriya hech qachon o'chmaydi — `active = false` bo'ladi, shuning uchun
 eski operatsiyalar hisobotlarda joyida qoladi.
 
+Nomini o'zgartirish ham xavfsiz: `/rename_cat <id> <yangi nom>`. ID
+o'zgarmagani uchun eski yozuvlar yangi nom bilan ko'rinadi, hech narsa
+yo'qolmaydi.
+
 ---
 
 ## 7. Boshlang'ich qoldiq
@@ -533,6 +537,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 | `/add_group <income\|expense> <nom>` | Yangi guruh |
 | `/add_cat <guruh_id> <nom>` | Yangi kategoriya |
 | `/add_sub <kategoriya_id> <nom1, nom2>` | Yangi podkategoriya(lar) |
+| `/rename_cat <id> <yangi nom>` | Nomini o'zgartirish (yozuvlar saqlanadi) |
 | `/del_cat <id>` | Istalgan darajani yashirish |
 | `/del <id> <sabab>` | Yozuvni bekor qilish |
 
@@ -555,7 +560,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (158 ta tekshiruv)
+onix/tests/          testlar (165 ta tekshiruv)
 ```
 
 ## 14. Testlar

@@ -928,6 +928,7 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<code>/add_group &lt;income|expense&gt; &lt;nom&gt;</code>\n` +
   `<code>/add_cat &lt;guruh_id&gt; &lt;nom&gt;</code>\n` +
   `<code>/add_sub &lt;kategoriya_id&gt; &lt;nom1, nom2&gt;</code>\n` +
+  `<code>/rename_cat &lt;id&gt; &lt;yangi nom&gt;</code>\n` +
   `<code>/del_cat &lt;id&gt;</code> — istalgan darajani yashiradi\n\n` +
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
@@ -1119,6 +1120,28 @@ bot.command('add_sub', adminOnly(async (ctx) => {
   return ctx.reply(
     `✅ ${f.esc(c.name)} ostiga ${added.length} ta qo'shildi:\n` +
     added.map(a => `   <code>${a.id}</code> ${f.esc(a.name)}`).join('\n'), HTML);
+}));
+
+// Kategoriya nomini o'zgartirish. ID o'zgarmaydi, shuning uchun eski
+// yozuvlar va hisobotlar joyida qoladi — faqat ko'rinadigan nom almashadi.
+bot.command('rename_cat', adminOnly(async (ctx) => {
+  const [id, ...name] = args(ctx);
+  if (!id || !name.length) {
+    return ctx.reply("Foydalanish:\n<code>/rename_cat 55 Yangi nom</code>\n\n" +
+      "<i>ID ni /cats dan oling. Guruh, kategoriya va podkategoriya — hammasi bo'ladi.\n" +
+      "Eski yozuvlar yo'qolmaydi, faqat nomi almashadi.</i>", HTML);
+  }
+  const before = await db.getCategory(parseInt(id, 10));
+  if (!before) return ctx.reply("❌ Bunday kategoriya yo'q. /cats bilan ID ni tekshiring.");
+
+  const after = await db.one(
+    'UPDATE onix_categories SET name = $2 WHERE id = $1 RETURNING *',
+    [before.id, name.join(' ')]);
+
+  return ctx.reply(
+    `✅ <b>Nomi o'zgartirildi</b>\n\n` +
+    `<s>${f.esc(before.name)}</s> → <b>${f.esc(after.name)}</b>\n` +
+    `<i>Eski yozuvlar va hisobotlar joyida qoldi.</i>`, HTML);
 }));
 
 bot.command('del_cat', adminOnly(async (ctx) => {

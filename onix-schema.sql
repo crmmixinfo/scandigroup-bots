@@ -253,6 +253,18 @@ WHERE NOT EXISTS (
   SELECT 1 FROM onix_accounts a WHERE a.name = v.name AND a.currency = v.currency
 );
 
+-- Bir martalik nom o'zgarishi: «Divident» → «Ta'sischiga».
+-- Buxgalteriya atamasi hodimlarga tushunarsiz edi, ustiga kirimdagi
+-- «Ta'sischidan» bilan juft bo'lgani mantiqan to'g'riroq. Kategoriya ID si
+-- o'zgarmaydi, shuning uchun eski yozuvlar joyida qoladi.
+UPDATE onix_categories
+   SET name = 'Ta''sischiga'
+ WHERE level = 1 AND flow = 'expense' AND name = 'Divident'
+   AND NOT EXISTS (
+     SELECT 1 FROM onix_categories c
+     WHERE c.level = 1 AND c.flow = 'expense' AND c.name = 'Ta''sischiga'
+   );
+
 -- ---------- Kategoriyalar ----------
 -- Kategoriyalar sxemada emas, `onix/kategoriyalar.txt` faylida turadi.
 -- Yuklash:  npm run onix:categories

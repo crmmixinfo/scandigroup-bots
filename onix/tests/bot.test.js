@@ -420,6 +420,32 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(!repList.includes("Kassa qoldig'i"), 'hisobotlar ichida endi yo\'q');
   ok(repList.includes('Kassa daftari'), 'daftar hisobotlarda qoldi');
 
+  // ═══ 15. KATEGORIYA NOMINI O'ZGARTIRISH ═══
+  console.log('\n─── /rename_cat ───');
+  const catBefore = await db.getCategory(ozOvqat);
+  const opsBeforeRename = (await db.countOperations({})).n;
+
+  sent = []; await msg(`/rename_cat ${ozOvqat} Oziq-ovqat mahsulotlari`, 201);
+  ok(last().includes('Faqat administrator'), 'hodim nomini o\'zgartira olmadi');
+
+  sent = []; await msg(`/rename_cat ${ozOvqat} Oziq-ovqat mahsulotlari`, 1);
+  ok(last().includes("o'zgartirildi"), 'admin o\'zgartirdi');
+  const catAfter = await db.getCategory(ozOvqat);
+  eq(catAfter.name, 'Oziq-ovqat mahsulotlari', 'yangi nom saqlandi');
+  eq(catAfter.id, catBefore.id, 'ID o\'zgarmadi');
+  eq((await db.countOperations({})).n, opsBeforeRename, 'yozuvlar yo\'qolmadi');
+
+  // Eski yozuv yangi nom bilan ko'rinadi
+  const renamedOp = await db.one(
+    'SELECT id FROM onix_operations WHERE category_id = $1 AND deleted_at IS NULL LIMIT 1', [ozOvqat]);
+  if (renamedOp) {
+    const full = await db.getOperation(renamedOp.id);
+    eq(full.category_name, 'Oziq-ovqat mahsulotlari', 'eski yozuv yangi nom bilan chiqdi');
+  }
+
+  sent = []; await msg('/rename_cat 999999 Yangi', 1);
+  ok(last().includes("yo'q"), 'mavjud bo\'lmagan ID rad etildi');
+
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();
   process.exit(fail ? 1 : 0);
