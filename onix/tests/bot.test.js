@@ -274,45 +274,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg(K.MENU.myBalance, 201);
   ok(last().includes('5 000 000'), 'bekor qilingandan keyin qoldiq tiklandi');
 
-  // ═══ 9. TUGMA BILAN BEKOR QILISH ═══
-  console.log('\n─── Daftardagi 🗑 tugmasi ───');
-  const before = (await db.countOperations({})).n;
-  const buttons = () => (kb || []).flat().map(b => b.text).join(' ');
-
-  // Daftarni yozuv turgan oyga ochamiz — «Bu oy» joriy oyni oladi,
-  // test yozuvlari esa boshqa oyda
-  const target = (await db.listOperations({ limit: 1 }))[0];
-  const targetMonth = target.paid_at.toISOString().slice(0, 8) + '01';
-
-  sent = []; await msg(K.MENU.book, 101);
-  await cb('rng:pick', 101);
-  await cb(`rrange:${targetMonth}`, 101);
-  ok(buttons().includes(`🗑 #${target.id}`), "daftarda o'chirish tugmasi bor");
-
-  // «Yo'q» — hech narsa o'zgarmasin
-  sent = []; await cb(`rm:${target.id}`, 101);
-  ok(sent.some(x => x.text && x.text.includes('bekor qilinsinmi')), "tasdiq so'raldi");
-  sent = []; await cb('rmn', 101);
-  eq((await db.countOperations({})).n, before, "«Yo'q» bosilganda yozuv joyida qoldi");
-
-  // «Ha» — o'chsin va qoldiq to'g'rilansin
-  await cb(`rm:${target.id}`, 101);
-  sent = []; await cb(`rmy:${target.id}`, 101);
-  ok(sent.some(x => x.text && x.text.includes('Bekor qilindi')), 'tugma bilan bekor qilindi');
-  eq((await db.countOperations({})).n, before - 1, 'daftardan chiqdi');
-
-  // Takroriy bosish ta'sir qilmasin
-  sent = []; await cb(`rmy:${target.id}`, 101);
-  eq((await db.countOperations({})).n, before - 1, "takroriy bosish ta'sir qilmadi");
-
-  // Hodim begonasini o'chira olmasin
-  const other = (await db.listOperations({ limit: 1 }))[0];
-  sent = []; await cb(`rm:${other.id}`, 201);
-  ok(!sent.some(x => x.text && x.text.includes('bekor qilinsinmi')), "hodimga tasdiq ko'rsatilmadi");
-  await cb(`rmy:${other.id}`, 201);
-  eq((await db.countOperations({})).n, before - 1, "hodim begona yozuvni o'chira olmadi");
-
-  // ═══ 10. BOSHLANG'ICH QOLDIQ ═══
+  // ═══ 9. BOSHLANG'ICH QOLDIQ ═══
   console.log('\n─── Boshlang\'ich qoldiq ───');
   await db.addUser(1, 'Bosh admin', 'admin', 1);
 

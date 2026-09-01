@@ -769,11 +769,6 @@ async function renderRange(ctx, from, to) {
 
 const PER_PAGE = 8;
 
-// Admin har qanday yozuvni, qolganlar faqat o'zinikini bekor qila oladi.
-// Buyruq (/del) ham, tugma ham shu qoidaga tayanadi.
-const mayDelete = (user, op) =>
-  isAdmin(user) || String(op.created_by) === String(user.tg_id);
-
 async function renderBook(ctx, edit = false) {
   const r = ctx.session.r;
   const mine = r.kind === 'myops';
@@ -792,7 +787,6 @@ async function renderBook(ctx, edit = false) {
   const kb = K.bookKeyboard(ops, {
     page: r.page, total: count.n, perPage: PER_PAGE,
     prefix: mine ? 'myops' : 'book',
-    canDelete: (op) => mayDelete(ctx.user, op),
   });
   const opts = { ...HTML, ...kb };
   // Tugmadan kelgan bo'lsa xabarni yangilaymiz, menyudan kelgan bo'lsa yangisini yuboramiz
@@ -804,44 +798,6 @@ bot.action(/^(book|myops):(\d+)$/, async (ctx) => {
   if (!ctx.session.r) return;
   ctx.session.r.page = +ctx.match[2];
   return renderBook(ctx, true);
-});
-
-// ---------- Yozuvni tugma bilan bekor qilish ----------
-
-bot.action(/^rm:(\d+)$/, async (ctx) => {
-  await ctx.answerCbQuery();
-  const op = await db.getOperation(+ctx.match[1]);
-  if (!op)          return ctx.answerCbQuery("Yozuv topilmadi", { show_alert: true }).catch(() => {});
-  if (op.deleted_at) return ctx.answerCbQuery("Bu yozuv allaqachon bekor qilingan", { show_alert: true }).catch(() => {});
-  if (!mayDelete(ctx.user, op)) {
-    return ctx.answerCbQuery("Faqat o'z yozuvingizni bekor qila olasiz", { show_alert: true }).catch(() => {});
-  }
-  return ctx.reply(
-    `🗑 <b>Bu yozuv bekor qilinsinmi?</b>\n\n${V.operationLine(op)}\n\n` +
-    `<i>Kassa qoldig'i shu zahoti to'g'rilanadi.</i>`,
-    { ...HTML, ...K.confirmDelete(op.id) });
-});
-
-bot.action('rmn', async (ctx) => {
-  await ctx.answerCbQuery('Bekor qilinmadi');
-  return ctx.editMessageText('✖️ Yozuv joyida qoldi.').catch(() => {});
-});
-
-bot.action(/^rmy:(\d+)$/, async (ctx) => {
-  const op = await db.getOperation(+ctx.match[1]);
-  if (!op || op.deleted_at) return ctx.answerCbQuery('Yozuv topilmadi yoki allaqachon bekor qilingan');
-  if (!mayDelete(ctx.user, op)) return ctx.answerCbQuery("Ruxsat yo'q", { show_alert: true });
-
-  await db.softDelete(op.id, ctx.user.tg_id, 'tugma orqali bekor qilindi');
-  await ctx.answerCbQuery('Bekor qilindi');
-  await ctx.editMessageText(
-    `🗑 <b>Bekor qilindi</b>  <code>#${op.id}</code>\n\n${V.operationLine(op)}`, HTML);
-
-  // Yangi qoldiqni ko'rsatamiz
-  const acc = (await db.balances({ currency: op.currency })).find(a => a.account_id === op.account_id);
-  if (acc) {
-    await ctx.reply(`💼 <b>${f.esc(acc.name)}</b> yangi qoldiq: <b>${f.money(acc.balance, acc.currency)}</b>`, HTML);
-  }
 });
 
 // ================= Sozlamalar (admin) =================
@@ -1059,6 +1015,9 @@ bot.command('del_cat', adminOnly(async (ctx) => {
 }));
 
 // Operatsiyani bekor qilish — muallif o'zinikini, admin har qanaqasini
+const mayDelete = (user, op) =>
+  isAdmin(user) || String(op.created_by) === String(user.tg_id);
+
 bot.command('del', async (ctx) => {
   const [id, ...reason] = args(ctx);
   if (!id) return ctx.reply('Foydalanish: <code>/del 42 sabab</code>', HTML);
@@ -1066,7 +1025,7 @@ bot.command('del', async (ctx) => {
   const op = await db.getOperation(parseInt(id, 10));
   if (!op) return ctx.reply('❌ Bunday yozuv yo\'q.');
   if (op.deleted_at) return ctx.reply('ℹ️ Bu yozuv allaqachon bekor qilingan.');
-  if (!isAdmin(ctx.user) && String(op.created_by) !== String(ctx.user.tg_id)) {
+  if (!mayDelete(ctx.user, op)) {
     return ctx.reply('🔒 Faqat o\'z yozuvingizni bekor qila olasiz.');
   }
   if (!reason.length) return ctx.reply('✍️ Sababini yozing: <code>/del 42 xato kiritildi</code>', HTML);

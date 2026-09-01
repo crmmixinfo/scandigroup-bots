@@ -205,10 +205,15 @@ davrlarda u avtomat «boshlang'ich qoldiq» bo'lib o'tadi.
 
 ### Yozuvni bekor qilish
 
-**📋 Kassa daftari** ni oching — har bir yozuv uchun `🗑 #12` tugmasi chiqadi.
-Bosing, tasdiqlang — tamom. Kassa qoldig'i shu zahoti to'g'rilanadi.
+```
+/del 12 xato kiritildi
+```
 
-Buyruq bilan ham bo'ladi: `/del 12 sabab`
+Raqamni kassa daftaridan olasiz — har yozuv tagida `#12` turadi.
+Sabab yozish majburiy.
+
+Tugma ataylab qo'yilmagan: bir bosishda yozuv yo'qolishi xavfli, va sabab
+yozilmay qolardi.
 
 | Kim | Nimani bekor qila oladi |
 |---|---|

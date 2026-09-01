@@ -154,36 +154,21 @@ const rangePreset = (prefix) => Markup.inlineKeyboard([
   CANCEL,
 ]);
 
-// Daftar: har yozuv uchun o'chirish tugmasi + sahifalash
-function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book', canDelete } = {}) {
-  const rows = [];
-
-  // O'chirish tugmalari — uchtadan, yozuv raqami bilan
-  const removable = ops.filter(o => !canDelete || canDelete(o));
-  for (let i = 0; i < removable.length; i += 3) {
-    rows.push(removable.slice(i, i + 3).map(o =>
-      Markup.button.callback(`🗑 #${o.id}`, `rm:${o.id}`)));
-  }
-
+// Daftar sahifalash.
+// O'chirish tugmasi ataylab yo'q: bir bosishda yozuv yo'qolishi xavfli,
+// shuning uchun bekor qilish faqat /del buyrug'i orqali — sabab yozib.
+function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book' } = {}) {
   const pages = Math.max(1, Math.ceil(total / perPage));
-  if (pages > 1) {
-    const nav = [];
-    if (page > 0)         nav.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
-    nav.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
-    if (page < pages - 1) nav.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
-    rows.push(nav);
-  }
-  return Markup.inlineKeyboard(rows);
+  if (pages < 2) return Markup.inlineKeyboard([]);
+  const nav = [];
+  if (page > 0)         nav.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
+  nav.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
+  if (page < pages - 1) nav.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
+  return Markup.inlineKeyboard([nav]);
 }
-
-// O'chirishni tasdiqlash
-const confirmDelete = (id) => Markup.inlineKeyboard([
-  [Markup.button.callback('🗑 Ha, bekor qilinsin', `rmy:${id}`),
-   Markup.button.callback('✖️ Yo\'q', 'rmn')],
-]);
 
 module.exports = {
   MENU, mainMenu, accounts, groups, categories, subCategories,
   payDate, period, monthGrid, skipNote, confirm, currencies, rangePreset,
-  bookKeyboard, confirmDelete,
+  bookKeyboard,
 };
