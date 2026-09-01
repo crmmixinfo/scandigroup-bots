@@ -173,6 +173,15 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   ok(msgs.length >= 2, 'bir necha alohida xabar');
   ok(msgs[0].includes('KASSA'), '1-xabar — kassa');
   ok(msgs[0].includes('12.01.2026'), 'sana to\'g\'ri');
+  ok(msgs[0].includes('KUN BOSHIDA'), 'kun boshidagi qoldiq bor');
+  ok(msgs[0].includes('KUN OXIRIDA'), 'kun oxiridagi qoldiq bor');
+
+  // Qoldiq to'g'ri hisoblanadimi: 12-yanvarda Ali podotchyotdan 3 mln
+  // sarfladi — bu kassa qoldig'iga tegmaydi (pul allaqachon uning qo'lida)
+  const kassaBefore = await R.openingBalance('2026-01-12', 'UZS');
+  const kassaAfter  = await R.openingBalance('2026-01-13', 'UZS');
+  eq(kassaAfter - kassaBefore, -3_000_000,
+     'kun ichidagi harakat qoldiqqa to\'g\'ri tushdi');
   ok(msgs.some(m => m.includes('KUNLIK HISOBOT') && m.includes('Kun boshida')),
      'hodim alohida xabarda, batafsil');
   ok(msgs[msgs.length - 1].includes('QOLDIQLAR') &&

@@ -348,6 +348,11 @@ va kerakligini alohida uzatish mumkin bo'lsin:
 📋 KASSA
 📅 31.08.2026, dushanba
 
+⚖️ KUN BOSHIDA
+ 💵 Naqd (sum)         12 500 000 so'm
+ 💳 Plastik (sum)      30 000 000 so'm
+ JAMI                  42 500 000 so'm
+
 📥 KIRIM
  · mijoz nomi          18 000 000 so'm
       Onix bussines center › Ijara to'lovi
@@ -363,8 +368,18 @@ Jami chiqim           −12 200 000 so'm
 👛 HODIMLARGA BERILDI
  · Asadbek Abduqahhorov 3 000 000 so'm
       Naqd (sum) dan · Xo'jalik uchun
-Jami berildi           −4 500 000 so'm
+Jami berildi           −3 000 000 so'm
+
+──────────────────────────────────────
+⚖️ KUN OXIRIDA
+ 💵 Naqd (sum)          6 500 000 so'm
+ 💳 Plastik (sum)      48 000 000 so'm
+ JAMI                  54 500 000 so'm
 ```
+
+Kassa daftari sahifasidek: kun boshidagi qoldiq, kun ichidagi harakatlar,
+kun oxiridagi qoldiq. Hodimlar hamyoni bu yerga kirmaydi — ular o'z
+xabarlarida.
 
 **2. 👤 Har bir hodim — alohida xabar**
 
@@ -549,7 +564,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (155 ta tekshiruv)
+onix/tests/          testlar (158 ta tekshiruv)
 ```
 
 ## 14. Testlar

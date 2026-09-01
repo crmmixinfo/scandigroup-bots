@@ -23,6 +23,19 @@ const sarlavha = (date) => {
   return `${f.d(date)}, ${KUNLAR[dt.getDay()]}`;
 };
 
+// Kassa hisoblarining (hodim hamyonlaridan tashqari) berilgan sanaga qoldig'i
+async function kassaBalances(currency, upTo) {
+  return db.all(`
+    SELECT a.name, a.emoji,
+           COALESCE((
+             SELECT SUM(delta) FROM (${R.MOVES_SQL} AND o.paid_at <= $2) m
+             WHERE m.account_id = a.id
+           ), 0) AS balance
+    FROM onix_accounts a
+    WHERE a.active AND a.currency = $1 AND a.kind <> 'podotchet'
+    ORDER BY a.sort_order, a.id`, [currency, upTo]);
+}
+
 // ---------- 1. Kassa harakati ----------
 // Hodimlarning xarajati bu yerga kirmaydi — ular o'z bo'limida ko'rsatiladi.
 async function kassaSection(date, currency) {
@@ -45,16 +58,38 @@ async function kassaSection(date, currency) {
       AND a.kind <> 'podotchet'          -- hodim hamyonidan chiqqani bu yerda emas
     ORDER BY o.id`, [date, currency]);
 
-  if (!rows.length) return null;
+  // Kun boshidagi qoldiq — kechagi kun oxiri
+  const prev = new Date(date + 'T00:00:00');
+  prev.setDate(prev.getDate() - 1);
+  const opening = await kassaBalances(currency, f.iso(prev));
+  const closing = await kassaBalances(currency, date);
+
+  const sum = (list) => list.reduce((a, r) => a + Number(r.balance), 0);
+  const hasMoney = sum(opening) !== 0 || sum(closing) !== 0;
+  if (!rows.length && !hasMoney) return null;
 
   const income   = rows.filter(r => r.type === 'income');
   const expense  = rows.filter(r => r.type === 'expense');
   const toStaff  = rows.filter(r => r.type === 'transfer' && r.to_kind === 'podotchet');
   const other    = rows.filter(r => r.type === 'transfer' && r.to_kind !== 'podotchet');
-  const opening  = rows.filter(r => r.type === 'opening');
+  const openingOps = rows.filter(r => r.type === 'opening');
 
   const L = [];
   const total = (list, field = 'amount') => list.reduce((a, r) => a + Number(r[field]), 0);
+
+  // Qoldiqlar jadvali — kassa daftari sahifasidek
+  const balanceBlock = (title, list) => {
+    const out = [title];
+    for (const r of list) {
+      if (Number(r.balance) === 0 && list.length > 2) continue;
+      out.push(V.row(`${r.emoji || '•'} ${r.name}`, Number(r.balance), currency, { indent: 1 }));
+    }
+    out.push(V.row('JAMI', sum(list), currency, { indent: 1 }));
+    return out;
+  };
+
+  L.push(...balanceBlock('⚖️ KUN BOSHIDA', opening));
+  L.push('');
 
   // Summali qatorda faqat eng pastki nom — sig'masa qirqilib ketmasin.
   // To'liq yo'l va hisob pastdagi qatorlarda, qirqilmasdan turadi.
@@ -98,15 +133,18 @@ async function kassaSection(date, currency) {
     L.push('');
   }
 
-  if (opening.length) {
+  if (openingOps.length) {
     L.push("⚖️ BOSHLANG'ICH QOLDIQ KIRITILDI");
-    for (const r of opening) {
+    for (const r of openingOps) {
       L.push(V.row(r.account_name, Number(r.amount), currency, { indent: 1 }));
     }
     L.push('');
   }
 
-  return L.length ? `${V.curLabel(currency)}\n<pre>${f.esc(L.join('\n').trimEnd())}</pre>` : null;
+  L.push('─'.repeat(38));
+  L.push(...balanceBlock('⚖️ KUN OXIRIDA', closing));
+
+  return `${V.curLabel(currency)}\n<pre>${f.esc(L.join('\n').trimEnd())}</pre>`;
 }
 
 // ---------- 3. Kun boshiga qoldiqlar ----------
