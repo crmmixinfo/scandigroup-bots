@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS onix_users (
 -- Telegram username — hodim /start bosganda taniib olish uchun
 ALTER TABLE onix_users ADD COLUMN IF NOT EXISTS username TEXT;
 
+-- ---------- Tizim sozlamalari (kalit → qiymat) ----------
+-- Kunlik hisobot qaysi kunga yuborilgani shu yerda saqlanadi: bot o'chib
+-- yonsa ham hisobot ikki marta ketmaydi, kechikkani esa yuboriladi.
+CREATE TABLE IF NOT EXISTS onix_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- ---------- Kutilayotgan foydalanuvchilar ----------
 -- Bot @username ni raqamli ID ga aylantira olmaydi, shuning uchun admin
 -- odamni username bo'yicha oldindan yozib qo'yadi. Hodim botga /start

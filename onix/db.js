@@ -90,6 +90,17 @@ async function ensurePodotchet(tgId, fullName) {
   }
 }
 
+// ================= Sozlamalar =================
+
+const getSetting = async (key) => {
+  const row = await one('SELECT value FROM onix_settings WHERE key = $1', [key]);
+  return row ? row.value : null;
+};
+
+const setSetting = (key, value) =>
+  q(`INSERT INTO onix_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`, [key, value]);
+
 // ================= Hisoblar =================
 
 // kind: 'kassa' — podotchyot bo'lmagan hisoblar; 'podotchet' — hodim qo'lidagi pul
@@ -246,6 +257,7 @@ module.exports = {
   pool, q, one, all, SUPER_ADMIN_ID,
   getUser, listUsers, addUser, deactivateUser, ensurePodotchet, normUsername,
   addPendingUser, listPendingUsers, removePendingUser, bindPendingUser, touchUsername,
+  getSetting, setSetting,
   listAccounts, getAccount, balances,
   listGroups, listChildren, hasChildren, getCategory, addCategory, deactivateCategory, categoryTree,
   addOperation, getOperation, softDelete, listOperations, countOperations,

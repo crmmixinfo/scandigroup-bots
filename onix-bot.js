@@ -10,6 +10,7 @@ const db = require('./onix/db');
 const R  = require('./onix/reports');
 const V  = require('./onix/views');
 const K  = require('./onix/keyboards');
+const daily = require('./onix/daily');
 const f  = require('./onix/format');
 
 const bot = new Telegraf(process.env.ONIX_BOT_TOKEN);
@@ -822,7 +823,11 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<code>/del_cat &lt;id&gt;</code> — istalgan darajani yashiradi\n\n` +
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
-  `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>`,
+  `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>\n\n` +
+  `<b>Kunlik hisobot</b>\n` +
+  `Har kuni soat ${DAILY_TIME} da admin va rahbarlarga avtomat yuboriladi.\n` +
+  `<code>/kunlik</code> — hozir ko'rish (kechagi kun)\n` +
+  `<code>/kunlik 29.08.2026</code> — tanlangan kun`,
   { ...HTML, ...Markup.inlineKeyboard([
       [Markup.button.callback("⚖️ Boshlang'ich qoldiq kiritish", 'openbal')],
   ]) }));
@@ -1048,6 +1053,71 @@ bot.command('help', (ctx) => ctx.reply(
   `<i>Masalan: yanvarda fevral arendasini to'lasangiz, ` +
   `pul oqimi yanvarni, foyda-zarar fevralni ko'rsatadi.</i>`, HTML));
 
+// ================= Kunlik hisobot =================
+//
+// Har kuni belgilangan soatda kechagi kun bo'yicha yuboriladi.
+// Aniq soatga timer qo'yish o'rniga har 10 daqiqada tekshiramiz: bot
+// o'chib yonsa, MacBook uxlab tursa yoki internet uzilsa ham hisobot
+// yo'qolmaydi — kechikib bo'lsa ham yetib boradi. Yuborilgan kun bazada
+// belgilanadi, shuning uchun ikki marta ketmaydi.
+
+const DAILY_KEY = 'daily_report_last_sent';
+const DAILY_TIME = (process.env.ONIX_DAILY_TIME || '09:00').trim();
+const DAILY_ENABLED = process.env.ONIX_DAILY !== 'off';
+
+function dailyDue(now = new Date()) {
+  const [h, m] = DAILY_TIME.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+  return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m);
+}
+
+async function sendDailyReport(date, to) {
+  const messages = await daily.build(date);
+  const people = to || await daily.recipients();
+  let delivered = 0;
+
+  for (const person of people) {
+    let ok = true;
+    for (const text of messages) {
+      try { await bot.telegram.sendMessage(person.tg_id, text, HTML); }
+      catch (err) { ok = false; console.error(`Kunlik hisobot yuborilmadi (${person.full_name}): ${err.message}`); break; }
+    }
+    if (ok) delivered++;
+  }
+  return { delivered, total: people.length, messages: messages.length };
+}
+
+async function checkDailyReport() {
+  if (!DAILY_ENABLED) return;
+  try {
+    const now = new Date();
+    if (!dailyDue(now)) return;
+
+    const target = daily.yesterday(now);          // kechagi kun bo'yicha
+    if (await db.getSetting(DAILY_KEY) === target) return;   // allaqachon yuborilgan
+
+    const people = await daily.recipients();
+    if (!people.length) return;                   // hali hech kim ulanmagan — keyingi safar
+
+    const res = await sendDailyReport(target, people);
+    await db.setSetting(DAILY_KEY, target);
+    console.log(`📅 Kunlik hisobot (${target}) yuborildi: ${res.delivered}/${res.total} kishi`);
+  } catch (err) {
+    console.error('Kunlik hisobot xatosi:', err.message);
+  }
+}
+
+// Qo'lda chaqirish — tekshirib ko'rish uchun
+bot.command('kunlik', async (ctx) => {
+  if (!canReport(ctx.user)) return ctx.reply('🔒 Bu bo\'lim sizga ochiq emas.');
+  const [arg] = args(ctx);
+  const date = arg ? f.parseDate(arg) : daily.yesterday();
+  if (!date) return ctx.reply('Foydalanish: <code>/kunlik</code> yoki <code>/kunlik 29.08.2026</code>', HTML);
+
+  const messages = await daily.build(date);
+  for (const text of messages) await ctx.reply(text, HTML);
+});
+
 // ================= Ishga tushirish =================
 
 bot.catch((err, ctx) => {
@@ -1119,6 +1189,12 @@ async function start() {
 
   bot.launch({ dropPendingUpdates: true });
   console.log(`✅ ONIX bot ishga tushdi — @${bot.botInfo.username}`);
+
+  if (DAILY_ENABLED) {
+    console.log(`   📅 Kunlik hisobot: har kuni soat ${DAILY_TIME} da (kechagi kun bo'yicha)`);
+    checkDailyReport();
+    setInterval(checkDailyReport, 10 * 60 * 1000);
+  }
   console.log(`   To'xtatish: Control + C`);
 }
 

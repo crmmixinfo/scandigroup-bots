@@ -358,10 +358,11 @@ onix/reports.js      pul oqimi, foyda-zarar, podotchyot hisob-kitobi
 onix/views.js        hisobotlarni matn ko'rinishida chizish
 onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
+onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (105 ta tekshiruv)
+onix/tests/          testlar (120 ta tekshiruv)
 ```
 
 ## 13. Testlar

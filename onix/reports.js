@@ -144,15 +144,19 @@ async function profitLossCompare(period, currency) {
 
 // ---------- PODOTCHYOT ----------
 // Har hodimning qo'lidagi qoldiq + davr ichida olgani va sarflagani
+// Qoldiq DAVR OXIRIGA hisoblanadi, bugungi holatga emas — aks holda
+// o'tgan oyning hisobotida bugungi raqam chiqib, chalkashlik bo'lardi.
 async function podotchetReport(from, to, currency) {
   const staff = await db.all(`
     SELECT u.tg_id, u.full_name, a.id AS account_id, a.currency,
-           b.balance
+           COALESCE((
+             SELECT SUM(delta) FROM (${MOVES} AND o.paid_at <= $2) m
+             WHERE m.account_id = a.id
+           ), 0) AS balance
     FROM onix_users u
     JOIN onix_accounts a ON a.owner_tg_id = u.tg_id AND a.kind = 'podotchet' AND a.active = true
-    JOIN onix_balances b ON b.account_id = a.id
     WHERE u.active = true AND u.role = 'staff' AND a.currency = $1
-    ORDER BY u.full_name`, [currency]);
+    ORDER BY u.full_name`, [currency, to]);
 
   for (const s of staff) {
     const row = await db.one(`

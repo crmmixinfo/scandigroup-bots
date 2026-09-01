@@ -6,6 +6,11 @@ const R  = require('../reports');
 const f  = require('../format');
 
 let pass = 0, fail = 0;
+const ok = (cond, label) => {
+  console.log(`${cond ? '✅' : '❌'} ${label}`);
+  cond ? pass++ : fail++;
+};
+
 const eq = (got, want, label) => {
   // Sonlar uchun yaqinlik, matn uchun aniq moslik
   const numeric = typeof want === 'number';
@@ -148,6 +153,45 @@ const accId = async (name) => (await db.one('SELECT id FROM onix_accounts WHERE 
   const def = await R.deferred('UZS', JAN);
   eq(def.length, 1, 'bitta kelgusi davr yozuvi');
   eq(def[0].total, 8_000_000, 'kelgusi oyga yozilgan summa');
+
+  console.log('\n─── PODOTCHYOT: qoldiq davr oxiriga ───');
+  // Ali 10-yanvarda 5 mln oldi, 12-yanvarda 3 mln sarfladi
+  const pod5  = await R.podotchetReport('2026-01-01', '2026-01-05', 'UZS');
+  const pod11 = await R.podotchetReport('2026-01-01', '2026-01-11', 'UZS');
+  const pod31 = await R.podotchetReport('2026-01-01', '2026-01-31', 'UZS');
+  const ali5  = pod5.find(x => String(x.tg_id) === '201');
+  const ali11 = pod11.find(x => String(x.tg_id) === '201');
+  const ali31 = pod31.find(x => String(x.tg_id) === '201');
+  eq(ali5.balance,  0,         '5-yanvarda hali pul olmagan');
+  eq(ali11.balance, 5_000_000, '11-yanvarda 5 mln qo\'lida');
+  eq(ali31.balance, 2_000_000, '31-yanvarda 2 mln qolgan');
+
+  console.log('\n─── KUNLIK HISOBOT ───');
+  const daily = require('../daily');
+
+  const msgs = await daily.build('2026-01-12');   // Ali oziq-ovqat sotib olgan kun
+  ok(msgs.length >= 1, 'hisobot tuzildi');
+  ok(msgs[0].includes('KUNLIK HISOBOT'), 'sarlavha bor');
+  ok(msgs[0].includes('12.01.2026'), 'sana to\'g\'ri');
+  ok(msgs.some(m => m.includes('Oziq-ovqat')), 'o\'sha kungi operatsiya ro\'yxatda');
+  ok(msgs.some(m => m.includes("qo'lidagi pul")), 'podotchyot bo\'limi bor');
+  ok(!msgs.some(m => m.includes('Ijara haqi')), 'boshqa kunning yozuvi kirmadi');
+
+  // Harakatsiz kun
+  const quiet = await daily.build('2026-01-02');
+  ok(quiet[0].includes('KUNLIK HISOBOT'), 'harakatsiz kunda ham hisobot keladi');
+  ok(quiet.length === 1, 'harakatsiz kunda ortiqcha xabar yo\'q');
+
+  // Kimga ketadi — faqat admin va rahbar
+  await db.addUser(301, 'Sardor Rahbar', 'manager', 101);
+  await db.addUser(1,   'Bosh admin',    'admin',   1);
+  const to = await daily.recipients();
+  const roles = to.map(u => u.role).sort().join(',');
+  eq(roles, 'admin,manager', 'faqat admin va rahbarlarga (kassir va hodimga emas)');
+
+  // Yuborilgan kun eslab qolinadi — ikki marta ketmasligi uchun
+  await db.setSetting('daily_report_last_sent', '2026-01-12');
+  eq(await db.getSetting('daily_report_last_sent'), '2026-01-12', 'yuborilgan kun saqlandi');
 
   console.log(`\n${fail === 0 ? '🎉' : '⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();
