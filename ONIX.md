@@ -241,22 +241,114 @@ izsiz yo'qolmaydi.
 
 ## 8. Hisobotlar
 
+Barcha hisobotlar bitta **📊 Hisobotlar** tugmasi ostida:
+
+```
+💹 Pul oqimi          — pul qachon harakat qilgani bo'yicha
+📈 Foyda-zarar        — xarajat qaysi oyga tegishli bo'lgani bo'yicha
+👤 Hodimlar           — kunlik batafsil
+📊 Kassa qoldig'i     — hozirgi holat
+📋 Kassa daftari      — barcha yozuvlar
+```
+
+Rolga qarab faqat ochiq bo'limlar ko'rinadi: kassirga qoldiq va daftar,
+rahbar va adminga hammasi, hodimga hech biri. Soxta so'rov yuborilsa ham
+serverda tekshiriladi.
+
+### Davrni tanlash
+
+| Hisobot | Davr |
+|---|---|
+| 💹 Pul oqimi | Bugun · Kecha · Bu hafta · Bu oy · O'tgan oy · **📅 Kun tanlash** · 📅 Oy tanlash |
+| 📈 Foyda-zarar | oy (yil bo'yicha o'tish bilan) |
+| 👤 Hodimlar | Bugun · Kecha · **📅 Kun tanlash** |
+| 📋 Kassa daftari | pul oqimi bilan bir xil |
+
+**📅 Kun tanlash** kalendar ochadi — `‹` va `›` bilan oyni almashtirib,
+istalgan kunni bosasiz:
+
+```
+‹    Iyul 2026    ›
+ 1  2  3  4  5  6  7
+ 8  9 10 11 12 13 14
+…
+```
+
+### Nima chiqadi
+
 **💹 Pul oqimi** (`paid_at` bo'yicha) — boshlang'ich qoldiq, kirim va chiqim
-bo'limlar kesimida, valyuta konvertatsiyasi, sof oqim, yakuniy qoldiq,
-har bir kassaning qoldig'i, hodimlar kesimida chiqim.
+guruh → kategoriya kesimida, valyuta konvertatsiyasi, sof oqim, yakuniy
+qoldiq, har kassaning qoldig'i, hodimlar kesimida chiqim.
 
-**📈 Foyda-zarar** (`period` bo'yicha) — daromad va xarajat bo'lim →
-podkategoriya kesimida, foyda/zarar, rentabellik, o'tgan oy bilan solishtirish.
-Oxirida «kelgusi davrlarga yozilganlar» eslatmasi chiqadi.
+**📈 Foyda-zarar** (`period` bo'yicha) — daromad va xarajat guruh →
+kategoriya → podkategoriya kesimida, foyda/zarar, rentabellik, o'tgan oy
+bilan solishtirish, va kelgusi davrlarga yozilganlar eslatmasi.
 
-**👛 Podotchyot** — har hodim bo'yicha: olgan, sarflagan, qaytargan, qo'lidagi qoldiq.
+**👤 Hodimlar** — bitta kun so'ralganda batafsil, bir necha kun
+so'ralganda qisqa jamlanma:
 
-**📋 Kassa daftari** — barcha yozuvlar sahifalab, `paid_at ≠ period` bo'lganda
+```
+👤 Asadbek Abduqahhorov
+Kun boshida             1 200 000 so'm
+
+OLINDI                 +3 000 000 so'm
+  ← Naqd (sum)          3 000 000 so'm
+     Xo'jalik uchun
+
+SARFLANDI                −800 000 so'm
+  · Salfetka              420 000 so'm
+       Onix xarajatlar uchun › Xo'jalik xarajatlari
+       💬 Metrodan
+  · Sovun                 380 000 so'm
+──────────────────────────────────────
+KUN OXIRIDA             3 400 000 so'm
+```
+
+**📋 Kassa daftari** — yozuvlar sahifalab, `paid_at ≠ period` bo'lganda
 qatorda `→ P&L: Fev 2026` belgisi bilan.
 
 ---
 
-## 9. Tokensiz sinab ko'rish
+## 9. Kunlik avtomat hisobot
+
+Har kuni **soat 09:00** da admin va rahbarlarga **kechagi kun** bo'yicha
+hisobot yuboriladi — Telegram xabari, uch qismda:
+
+1. **Kun yakuni** — kirim, chiqim, sof oqim, kun oxiridagi kassa qoldiqlari
+2. **Operatsiyalar ro'yxati** — kim, qaysi kategoriyaga, qancha kiritgani
+3. **Hodimlar bo'yicha batafsil** — yuqoridagi ko'rinishda
+
+Hodimlar va kassirga yuborilmaydi.
+
+### Sozlash
+
+`.env` faylida:
+
+```
+ONIX_DAILY_TIME=09:00     # soat (24 soatlik format)
+ONIX_DAILY=off            # butunlay o'chirish
+```
+
+### Bot o'chiq bo'lsa nima bo'ladi
+
+Hisobot yo'qolmaydi. Bot aniq soatga timer qo'ymaydi — har 10 daqiqada
+tekshiradi: «bugungi hisobot yuborilganmi?». Shuning uchun MacBook uxlab
+tursa, internet uzilsa yoki bot kechroq yoqilsa ham, hisobot kechikib
+bo'lsa-da yetib boradi. Yuborilgan kun bazada belgilanadi — ikki marta
+ketmaydi.
+
+### Qo'lda ko'rish
+
+```
+/kunlik                 — kechagi kun yakuni
+/kunlik 29.08.2026      — tanlangan kun
+/hodim                  — hodimlarning bugungi batafsili
+/hodim 29.08.2026       — tanlangan kun
+```
+
+---
+
+## 10. Tokensiz sinab ko'rish
 
 Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
 
@@ -277,7 +369,7 @@ kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
 
 ---
 
-## 10. O'rnatish
+## 11. O'rnatish
 
 ```bash
 npm install
@@ -337,7 +429,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 11. Sozlash buyruqlari (admin)
+## 12. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -361,7 +453,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 12. Fayllar
+## 13. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -375,10 +467,10 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (132 ta tekshiruv)
+onix/tests/          testlar (137 ta tekshiruv)
 ```
 
-## 13. Testlar
+## 14. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 
