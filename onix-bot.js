@@ -660,29 +660,42 @@ menu(K.MENU.myOps, canEnterOwn, (ctx) => {
   return renderBook(ctx);
 });
 
-menu(K.MENU.balance, canSeeAllBalances, async (ctx) => {
-  const rows = await db.balances();
-  return ctx.reply(V.balances(rows), HTML);
+// ---------- 📊 Hisobotlar bo'limi ----------
+
+// Rol qaysi hisobotlarni ko'ra oladi
+const canSeeReport = (user) => (need) =>
+  need === 'report' ? canReport(user) : canSeeBook(user);
+
+menu(K.MENU.reports, (u) => canSeeBook(u) || canReport(u), (ctx) => {
+  ctx.session.r = null;
+  return ctx.reply('📊 <b>Hisobotlar</b>\n\nQaysi hisobot kerak?',
+    { ...HTML, ...K.reportsMenu(canSeeReport(ctx.user)) });
 });
 
-menu(K.MENU.cashflow, canReport, (ctx) => {
-  ctx.session.r = { kind: 'cf' };
-  return ctx.reply('💹 <b>Pul oqimi</b>\n\nValyutani tanlang:', { ...HTML, ...K.currencies('rcur') });
-});
+// Hisobot turi tanlandi
+bot.action(/^rep:(cf|pl|staff|bal|book)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const kind = ctx.match[1];
+  const need = (kind === 'cf' || kind === 'pl' || kind === 'staff') ? 'report' : 'book';
+  if (!canSeeReport(ctx.user)(need)) {
+    return ctx.answerCbQuery("Bu bo'lim sizga ochiq emas", { show_alert: true }).catch(() => {});
+  }
 
-menu(K.MENU.pnl, canReport, (ctx) => {
-  ctx.session.r = { kind: 'pl' };
-  return ctx.reply('📈 <b>Foyda-zarar</b>\n\nValyutani tanlang:', { ...HTML, ...K.currencies('rcur') });
-});
+  // Kassa qoldig'i — davr so'ralmaydi, hozirgi holat
+  if (kind === 'bal') {
+    ctx.session.r = null;
+    return ctx.editMessageText(V.balances(await db.balances()), HTML);
+  }
 
-menu(K.MENU.podReport, canReport, (ctx) => {
-  ctx.session.r = { kind: 'pod' };
-  return ctx.reply('👛 <b>Podotchyot</b>\n\nValyutani tanlang:', { ...HTML, ...K.currencies('rcur') });
-});
+  ctx.session.r = { kind: kind === 'staff' ? 'pod' : kind, daily: kind === 'staff' };
 
-menu(K.MENU.book, canSeeBook, (ctx) => {
-  ctx.session.r = { kind: 'book', currency: null };
-  return ctx.reply('📋 <b>Kassa daftari</b>\n\nDavrni tanlang:', { ...HTML, ...K.rangePreset('rng') });
+  if (kind === 'book') {
+    return ctx.editMessageText('📋 <b>Kassa daftari</b>\n\nDavrni tanlang:',
+      { ...HTML, ...K.rangePreset('rng') });
+  }
+  const title = { cf: '💹 Pul oqimi', pl: '📈 Foyda-zarar', staff: '👤 Hodimlar' }[kind];
+  return ctx.editMessageText(`${title}\n\nValyutani tanlang:`,
+    { ...HTML, ...K.currencies('rcur') });
 });
 
 // ================= Hisobot oqimi =================
@@ -692,9 +705,14 @@ bot.action(/^rcur:(UZS|USD)$/, async (ctx) => {
   const r = ctx.session.r;
   if (!r) return;
   r.currency = ctx.match[1];
+
+  // Foyda-zarar — oylik, hodimlar — kunlik, qolgani — moslashuvchan
   if (r.kind === 'pl') {
     return ctx.editMessageText('📅 Qaysi oy uchun?',
       { ...HTML, ...K.monthGrid(new Date().getFullYear(), 'rmon') });
+  }
+  if (r.daily) {
+    return ctx.editMessageText('📅 Qaysi kun uchun?', { ...HTML, ...K.dayPreset('rng') });
   }
   return ctx.editMessageText('📅 Davrni tanlang:', { ...HTML, ...K.rangePreset('rng') });
 });
@@ -721,7 +739,7 @@ async function showDeferred(ctx, currency, period) {
 }
 
 // Davr presetlari
-bot.action(/^rng:(today|week|month|prevmonth|pick)$/, async (ctx) => {
+bot.action(/^rng:(today|yesterday|week|month|prevmonth|pick|day)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const r = ctx.session.r;
   if (!r) return;
@@ -729,8 +747,25 @@ bot.action(/^rng:(today|week|month|prevmonth|pick)$/, async (ctx) => {
     return ctx.editMessageText('📅 Oyni tanlang:',
       { ...HTML, ...K.monthGrid(new Date().getFullYear(), 'rrange') });
   }
+  if (ctx.match[1] === 'day') {
+    const now = new Date();
+    return ctx.editMessageText('📅 Kunni tanlang:',
+      { ...HTML, ...K.calendar(now.getFullYear(), now.getMonth() + 1) });
+  }
   const [from, to] = resolveRange(ctx.match[1]);
   return renderRange(ctx, from, to);
+});
+
+// Kalendar: oyni almashtirish va kunni tanlash
+bot.action(/^calm:(\d{4})-(\d{2})$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  return ctx.editMessageReplyMarkup(K.calendar(+ctx.match[1], +ctx.match[2]).reply_markup).catch(() => {});
+});
+
+bot.action(/^cald:(\d{4}-\d{2}-\d{2})$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  if (!ctx.session.r) return;
+  return renderRange(ctx, ctx.match[1], ctx.match[1]);   // bitta kun
 });
 
 bot.action(/^rrange:(\d{4}-\d{2}-\d{2})$/, async (ctx) => {
@@ -744,6 +779,10 @@ function resolveRange(preset) {
   const y = now.getFullYear(), m = now.getMonth() + 1;
   switch (preset) {
     case 'today': return [f.iso(now), f.iso(now)];
+    case 'yesterday': {
+      const d = new Date(now); d.setDate(now.getDate() - 1);
+      return [f.iso(d), f.iso(d)];
+    }
     case 'week': {
       const start = new Date(now);
       start.setDate(now.getDate() - ((now.getDay() + 6) % 7));   // dushanba

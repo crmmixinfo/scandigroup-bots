@@ -66,8 +66,11 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(sent.some(x => x.text && x.text.includes('Yangi foydalanuvchi')), 'adminga tasdiqlash so\'rovi ketdi');
   sent = []; await msg(K.MENU.income, 301);
   ok(last().includes('ochiq emas'), 'rahbar kirim kirita olmaydi');
-  sent = []; await msg(K.MENU.pnl, 101);
-  ok(last().includes('ochiq emas'), 'kassir foyda-zararni ko\'ra olmaydi');
+  sent = []; kb = null; await msg(K.MENU.reports, 101);
+  const menuBtns = () => (kb || []).flat().map(b => b.text).join(' ');
+  ok(!menuBtns().includes('Foyda-zarar'), 'kassirga foyda-zarar ko\'rsatilmadi');
+  sent = []; await cb('rep:pl', 101);
+  ok(!sent.some(x => x.text && x.text.includes('FOYDA-ZARAR')), 'kassir foyda-zararni ocha olmadi');
 
   // ═══ 2. KASSIR: KIRIM ═══
   console.log('\n─── Kassir: kirim (⭐ P&L keyingi oyga) ───');
@@ -214,12 +217,11 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   console.log('\n─── Hodim uchun ma\'lumot chegarasi ───');
 
   // Tugma menyusida yo'q, lekin matnni qo'lda yozib ko'radi
-  sent = []; await msg(K.MENU.balance, 201);
-  ok(last().includes('ochiq emas'), 'hodim umumiy kassa qoldig\'ini ko\'ra olmadi');
+  sent = []; await msg(K.MENU.reports, 201);
+  ok(last().includes('ochiq emas'), 'hodimga hisobotlar bo\'limi yopiq');
   ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'kompaniya kassalari ko\'rinmadi');
-
-  sent = []; await msg(K.MENU.book, 201);
-  ok(last().includes('ochiq emas'), 'hodim kassa daftarini ko\'ra olmadi');
+  sent = []; await cb('rep:bal', 201);
+  ok(!sent.some(x => x.text && x.text.includes('Naqd (sum)')), 'soxta so\'rov bilan ham ko\'ra olmadi');
 
   // O'z qoldig'ini esa ko'radi
   sent = []; await msg(K.MENU.myBalance, 201);
@@ -246,13 +248,15 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
 
   // ═══ 7. RAHBAR: HISOBOTLAR ═══
   console.log('\n─── Rahbar: hisobotlar ───');
-  sent = []; await msg(K.MENU.pnl, 301);
+  sent = []; await msg(K.MENU.reports, 301);
+  await cb('rep:pl', 301);
   await cb('rcur:UZS', 301);
   await cb('rmon:2026-04-01', 301);
   ok(sent.some(s => s.text && s.text.includes('FOYDA-ZARAR') && s.text.includes('40 000 000')),
      'aprel P&L da martda tushgan 40 mln ko\'rindi');
 
-  sent = []; await msg(K.MENU.cashflow, 301);
+  sent = []; await msg(K.MENU.reports, 301);
+  await cb('rep:cf', 301);
   await cb('rcur:UZS', 301);
   await cb('rng:pick', 301);
   await cb('rrange:2026-03-01', 301);
@@ -261,10 +265,23 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(sent.some(s => s.text && s.text.includes('Yangiobod')),
      'podkategoriyasiz guruh pul oqimida ko\'rindi');
 
-  sent = []; await msg(K.MENU.podReport, 301);
+  sent = []; kb = null; await msg(K.MENU.reports, 301);
+  await cb('rep:staff', 301);
   await cb('rcur:UZS', 301);
-  await cb('rng:month', 301);
-  ok(sent.some(s => s.text && s.text.includes('PODOTCHYOT')), 'podotchyot hisoboti chiqdi');
+  ok((kb || []).flat().some(b => b.text.includes('Kun tanlash')), 'hodimlar uchun kun tanlash bor');
+  sent = []; await cb('rng:today', 301);
+  ok(sent.some(s => s.text && s.text.includes('KUNLIK HISOBOT')), 'hodimlar kunlik hisoboti chiqdi');
+
+  // ⭐ Istalgan kunni kalendardan tanlash
+  sent = []; kb = null; await msg(K.MENU.reports, 301);
+  await cb('rep:cf', 301);
+  await cb('rcur:UZS', 301);
+  await cb('rng:day', 301);
+  ok((kb || []).flat().some(b => b.text === '‹'), 'kalendar ochildi');
+  await cb('calm:2026-03', 301);
+  ok((kb || []).flat().some(b => b.text === 'Mart 2026'), 'mart oyiga o\'tdi');
+  sent = []; await cb('cald:2026-03-05', 301);
+  ok(sent.some(s => s.text && s.text.includes('05.03.2026')), 'tanlangan kun bo\'yicha hisobot');
 
   // ═══ 8. YOZUVNI BEKOR QILISH ═══
   console.log('\n─── Yozuvni bekor qilish ───');

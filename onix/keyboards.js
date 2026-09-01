@@ -2,6 +2,7 @@
 
 const { Markup } = require('telegraf');
 const f = require('./format');
+const MONTHS_LONG = f.MONTHS;
 
 // ================= Asosiy menyu (doimiy tugmalar) =================
 
@@ -13,11 +14,7 @@ const MENU = {
   myExpense:'💸 Xarajat kiritish',
   myBalance:'👛 Qo\'limdagi qoldiq',
   myOps:    '📋 Mening operatsiyalarim',
-  balance:  '📊 Kassa qoldig\'i',
-  book:     '📋 Kassa daftari',
-  cashflow: '💹 Pul oqimi',
-  pnl:      '📈 Foyda-zarar',
-  podReport:'👛 Podotchyot qoldiqlar',
+  reports:  '📊 Hisobotlar',
   settings: '⚙️ Sozlamalar',
 };
 
@@ -25,25 +22,36 @@ const LAYOUT = {
   admin: [
     [MENU.income, MENU.expense],
     [MENU.podotchet, MENU.transfer],
-    [MENU.cashflow, MENU.pnl],
-    [MENU.balance, MENU.podReport],
-    [MENU.book, MENU.settings],
+    [MENU.reports, MENU.settings],
   ],
   cashier: [
     [MENU.income, MENU.expense],
     [MENU.podotchet, MENU.transfer],
-    [MENU.balance, MENU.book],
+    [MENU.reports],
   ],
   staff: [
     [MENU.myExpense],
     [MENU.myBalance, MENU.myOps],
   ],
   manager: [
-    [MENU.cashflow, MENU.pnl],
-    [MENU.balance, MENU.podReport],
-    [MENU.book],
+    [MENU.reports],
   ],
 };
+
+// Hisobotlar bo'limi — rolga qarab qaysilari ochiq
+const REPORTS = [
+  { key: 'cf',   label: '💹 Pul oqimi',        need: 'report' },
+  { key: 'pl',   label: '📈 Foyda-zarar',      need: 'report' },
+  { key: 'staff',label: '👤 Hodimlar',         need: 'report' },
+  { key: 'bal',  label: "📊 Kassa qoldig'i",   need: 'book'   },
+  { key: 'book', label: '📋 Kassa daftari',    need: 'book'   },
+];
+
+function reportsMenu(can) {
+  const rows = REPORTS.filter(r => can(r.need))
+    .map(r => [Markup.button.callback(r.label, `rep:${r.key}`)]);
+  return Markup.inlineKeyboard(rows);
+}
 
 const mainMenu = (role) =>
   Markup.keyboard(LAYOUT[role] || LAYOUT.manager).resize();
@@ -148,11 +156,46 @@ const currencies = (prefix) => Markup.inlineKeyboard([
 
 // Hisobot davri tez tanlash
 const rangePreset = (prefix) => Markup.inlineKeyboard([
-  [Markup.button.callback('Bugun', `${prefix}:today`), Markup.button.callback('Bu hafta', `${prefix}:week`)],
-  [Markup.button.callback('Bu oy', `${prefix}:month`), Markup.button.callback('O\'tgan oy', `${prefix}:prevmonth`)],
-  [Markup.button.callback('📅 Oy tanlash', `${prefix}:pick`)],
+  [Markup.button.callback('Bugun', `${prefix}:today`), Markup.button.callback('Kecha', `${prefix}:yesterday`)],
+  [Markup.button.callback('Bu hafta', `${prefix}:week`), Markup.button.callback('Bu oy', `${prefix}:month`)],
+  [Markup.button.callback("O'tgan oy", `${prefix}:prevmonth`)],
+  [Markup.button.callback('📅 Kun tanlash', `${prefix}:day`),
+   Markup.button.callback('📅 Oy tanlash', `${prefix}:pick`)],
   CANCEL,
 ]);
+
+// Faqat kun kerak bo'lganda (hodimlar hisoboti)
+const dayPreset = (prefix) => Markup.inlineKeyboard([
+  [Markup.button.callback('Bugun', `${prefix}:today`), Markup.button.callback('Kecha', `${prefix}:yesterday`)],
+  [Markup.button.callback('📅 Kun tanlash', `${prefix}:day`)],
+  CANCEL,
+]);
+
+// Kun kalendari — istalgan sanani tanlash
+function calendar(year, month /* 1-12 */) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (y, m) => `${y}-${pad(m)}`;
+
+  const prev = month === 1 ? [year - 1, 12] : [year, month - 1];
+  const next = month === 12 ? [year + 1, 1] : [year, month + 1];
+
+  const rows = [[
+    Markup.button.callback('‹', `calm:${key(...prev)}`),
+    Markup.button.callback(`${MONTHS_LONG[month - 1]} ${year}`, 'noop'),
+    Markup.button.callback('›', `calm:${key(...next)}`),
+  ]];
+
+  for (let d = 1; d <= daysInMonth; d += 7) {
+    const row = [];
+    for (let i = d; i < d + 7 && i <= daysInMonth; i++) {
+      row.push(Markup.button.callback(String(i), `cald:${year}-${pad(month)}-${pad(i)}`));
+    }
+    rows.push(row);
+  }
+  rows.push(CANCEL);
+  return Markup.inlineKeyboard(rows);
+}
 
 // Daftar sahifalash.
 // O'chirish tugmasi ataylab yo'q: bir bosishda yozuv yo'qolishi xavfli,
@@ -169,6 +212,7 @@ function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book' }
 
 module.exports = {
   MENU, mainMenu, accounts, groups, categories, subCategories,
-  payDate, period, monthGrid, skipNote, confirm, currencies, rangePreset,
+  payDate, period, monthGrid, skipNote, confirm, currencies,
+  reportsMenu, rangePreset, dayPreset, calendar,
   bookKeyboard,
 };
