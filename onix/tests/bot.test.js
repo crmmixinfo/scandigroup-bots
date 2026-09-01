@@ -66,11 +66,10 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(sent.some(x => x.text && x.text.includes('Yangi foydalanuvchi')), 'adminga tasdiqlash so\'rovi ketdi');
   sent = []; await msg(K.MENU.income, 301);
   ok(last().includes('ochiq emas'), 'rahbar kirim kirita olmaydi');
-  sent = []; kb = null; await msg(K.MENU.reports, 101);
-  const menuBtns = () => (kb || []).flat().map(b => b.text).join(' ');
-  ok(!menuBtns().includes('Foyda-zarar'), 'kassirga foyda-zarar ko\'rsatilmadi');
+  sent = []; await msg(K.MENU.reports, 101);
+  ok(last().includes('ochiq emas'), 'kassirga hisobotlar bo\'limi yopiq');
   sent = []; await cb('rep:pl', 101);
-  ok(!sent.some(x => x.text && x.text.includes('FOYDA-ZARAR')), 'kassir foyda-zararni ocha olmadi');
+  ok(!sent.some(x => x.text && x.text.includes('FOYDA-ZARAR')), 'soxta so\'rov ham rad etildi');
 
   // ═══ 2. KASSIR: KIRIM ═══
   console.log('\n─── Kassir: kirim (⭐ P&L keyingi oyga) ───');
@@ -268,7 +267,9 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; kb = null; await msg(K.MENU.reports, 301);
   await cb('rep:staff', 301);
   await cb('rcur:UZS', 301);
-  ok((kb || []).flat().some(b => b.text.includes('Kun tanlash')), 'hodimlar uchun kun tanlash bor');
+  ok((kb || []).flat().some(b => b.text.includes('Hammasi')), 'avval hodim so\'raladi');
+  await cb('rstaff:all', 301);
+  ok((kb || []).flat().some(b => b.text.includes('Kun tanlash')), 'keyin kun tanlash chiqdi');
   sent = []; await cb('rng:today', 301);
   ok(sent.some(s => s.text && s.text.includes('KUNLIK HISOBOT')), 'hodimlar kunlik hisoboti chiqdi');
 
@@ -372,6 +373,39 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(rep.includes('Kun boshida'), 'kun boshidagi qoldiq bor');
   ok(rep.includes('SARFLANDI'), 'sarflangani bor');
   ok(rep.includes('KUN OXIRIDA'), 'kun oxiri bor');
+
+  // ═══ 12. HODIM FAQAT O'Z HISOBOTINI KO'RADI ═══
+  console.log('\n─── Hodimning o\'z hisoboti ───');
+
+  sent = []; await msg(K.MENU.myReport, 201);
+  ok(last().includes('Qaysi kun'), 'hodimdan kun so\'raldi');
+  sent = []; await cb('rng:today', 201);
+  const mineText = sent.map(x => x.text || '').join('\n');
+  ok(mineText.includes('Ali Valiyev') || mineText.includes('harakat bo\'lmagan'),
+     'hodim o\'z hisobotini ko\'rdi');
+  ok(!mineText.includes('Vali Aliyev'), 'boshqa hodim ko\'rinmadi');
+
+  // Soxta so'rov bilan boshqa hodimni tanlashga urinish
+  sent = []; await cb('rstaff:202', 201);
+  ok(!sent.some(x => x.text && x.text.includes('Vali Aliyev')), 'boshqa hodimni tanlay olmadi');
+  sent = []; await cb('rng:today', 201);
+  const stillMine = sent.map(x => x.text || '').join('\n');
+  ok(!stillMine.includes('Vali Aliyev'), 'baribir faqat o\'zini ko\'rdi');
+
+  // ═══ 13. RAHBAR HODIM BO'YICHA FILTRLAYDI ═══
+  console.log('\n─── Hodim bo\'yicha filtr ───');
+  sent = []; kb = null; await msg(K.MENU.reports, 301);
+  await cb('rep:staff', 301);
+  await cb('rcur:UZS', 301);
+  const pickBtns = () => (kb || []).flat().map(b => b.text).join(' ');
+  ok(pickBtns().includes('Hammasi'), 'hodim tanlash oynasi chiqdi');
+  ok(pickBtns().includes('Ali Valiyev'), 'hodimlar ro\'yxatda');
+
+  sent = []; await cb('rstaff:201', 301);
+  ok(last().includes('Ali Valiyev'), 'tanlangan hodim ko\'rsatildi');
+  sent = []; await cb('rng:today', 301);
+  const oneStaff = sent.map(x => x.text || '').join('\n');
+  ok(!oneStaff.includes('Vali Aliyev'), 'faqat tanlangan hodim chiqdi');
 
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();

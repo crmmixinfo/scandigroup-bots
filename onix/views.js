@@ -179,11 +179,12 @@ function podotchet(rows, currency, from, to) {
 
 // ================= Hodimning bir kunlik hisoboti =================
 
-function staffDay(rows, date, currency) {
+function staffDay(rows, date, currency, onlyName = null) {
+  const title = onlyName ? `👤 ${f.esc(onlyName).toUpperCase()}` : '👤 HODIMLAR';
   const active = rows.filter(r => r.active);
   if (!active.length) {
-    return `<b>👤 HODIMLAR — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
-           `<i>Bu kuni hodimlarda harakat bo'lmagan.</i>`;
+    return `<b>${title} — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
+           `<i>Bu kuni harakat bo'lmagan.</i>`;
   }
 
   const blocks = active.map((s) => {
@@ -223,9 +224,9 @@ function staffDay(rows, date, currency) {
   });
 
   const total = active.reduce((a, s) => a + s.closing, 0);
-  return `<b>👤 HODIMLAR — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
-         blocks.join('\n') +
-         `\n<b>Jami qo'lda: ${f.money(total, currency)}</b>`;
+  const foot = active.length > 1 ? `\n<b>Jami qo'lda: ${f.money(total, currency)}</b>` : '';
+  return `<b>${title} — KUNLIK HISOBOT</b>\n📅 ${f.d(date)} · ${curLabel(currency)}\n\n` +
+         blocks.join('\n') + foot;
 }
 
 // ================= Kassa daftari =================

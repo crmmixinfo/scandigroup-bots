@@ -14,6 +14,7 @@ const MENU = {
   myExpense:'💸 Xarajat kiritish',
   myBalance:'👛 Qo\'limdagi qoldiq',
   myOps:    '📋 Mening operatsiyalarim',
+  myReport: '📊 Mening hisobotim',
   reports:  '📊 Hisobotlar',
   settings: '⚙️ Sozlamalar',
 };
@@ -27,11 +28,11 @@ const LAYOUT = {
   cashier: [
     [MENU.income, MENU.expense],
     [MENU.podotchet, MENU.transfer],
-    [MENU.reports],
   ],
   staff: [
     [MENU.myExpense],
-    [MENU.myBalance, MENU.myOps],
+    [MENU.myReport, MENU.myBalance],
+    [MENU.myOps],
   ],
   manager: [
     [MENU.reports],
@@ -40,18 +41,15 @@ const LAYOUT = {
 
 // Hisobotlar bo'limi — rolga qarab qaysilari ochiq
 const REPORTS = [
-  { key: 'cf',   label: '💹 Pul oqimi',        need: 'report' },
-  { key: 'pl',   label: '📈 Foyda-zarar',      need: 'report' },
-  { key: 'staff',label: '👤 Hodimlar',         need: 'report' },
-  { key: 'bal',  label: "📊 Kassa qoldig'i",   need: 'book'   },
-  { key: 'book', label: '📋 Kassa daftari',    need: 'book'   },
+  { key: 'cf',    label: '💹 Pul oqimi' },
+  { key: 'pl',    label: '📈 Foyda-zarar' },
+  { key: 'staff', label: '👤 Hodimlar' },
+  { key: 'bal',   label: "📊 Kassa qoldig'i" },
+  { key: 'book',  label: '📋 Kassa daftari' },
 ];
 
-function reportsMenu(can) {
-  const rows = REPORTS.filter(r => can(r.need))
-    .map(r => [Markup.button.callback(r.label, `rep:${r.key}`)]);
-  return Markup.inlineKeyboard(rows);
-}
+const reportsMenu = () =>
+  Markup.inlineKeyboard(REPORTS.map(r => [Markup.button.callback(r.label, `rep:${r.key}`)]));
 
 const mainMenu = (role) =>
   Markup.keyboard(LAYOUT[role] || LAYOUT.manager).resize();
@@ -164,6 +162,13 @@ const rangePreset = (prefix) => Markup.inlineKeyboard([
   CANCEL,
 ]);
 
+// Hodim tanlash — hammasi yoki bittasi
+function staffPicker(rows) {
+  const buttons = [[Markup.button.callback('👥 Hammasi', 'rstaff:all')]];
+  for (const u of rows) buttons.push([Markup.button.callback(`👤 ${u.full_name}`, `rstaff:${u.tg_id}`)]);
+  return Markup.inlineKeyboard([...buttons, CANCEL]);
+}
+
 // Faqat kun kerak bo'lganda (hodimlar hisoboti)
 const dayPreset = (prefix) => Markup.inlineKeyboard([
   [Markup.button.callback('Bugun', `${prefix}:today`), Markup.button.callback('Kecha', `${prefix}:yesterday`)],
@@ -213,6 +218,6 @@ function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book' }
 module.exports = {
   MENU, mainMenu, accounts, groups, categories, subCategories,
   payDate, period, monthGrid, skipNote, confirm, currencies,
-  reportsMenu, rangePreset, dayPreset, calendar,
+  reportsMenu, rangePreset, dayPreset, calendar, staffPicker,
   bookKeyboard,
 };

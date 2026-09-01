@@ -177,7 +177,7 @@ async function podotchetReport(from, to, currency) {
 // ---------- Hodimning bir kunlik batafsil hisoboti ----------
 // Kun boshida qancha bor edi → kimdan qancha oldi → nimaga sarfladi →
 // qancha qaytardi → kun oxirida qancha qoldi.
-async function staffDay(date, currency) {
+async function staffDay(date, currency, onlyTgId = null) {
   const prev = new Date(date + 'T00:00:00');
   prev.setDate(prev.getDate() - 1);
   const dayBefore = require('./format').iso(prev);
@@ -187,7 +187,8 @@ async function staffDay(date, currency) {
     FROM onix_users u
     JOIN onix_accounts a ON a.owner_tg_id = u.tg_id AND a.kind = 'podotchet' AND a.active
     WHERE u.active AND u.role = 'staff' AND a.currency = $1
-    ORDER BY u.full_name`, [currency]);
+      AND ($2::bigint IS NULL OR u.tg_id = $2)
+    ORDER BY u.full_name`, [currency, onlyTgId]);
 
   for (const s of staff) {
     const balanceAt = async (upTo) => Number((await db.one(
@@ -238,6 +239,14 @@ async function staffDay(date, currency) {
 
   return staff;
 }
+
+// Podotchyot hisobi bor hodimlar — filtr ro'yxati uchun
+const listStaff = () => db.all(`
+  SELECT DISTINCT u.tg_id, u.full_name
+  FROM onix_users u
+  JOIN onix_accounts a ON a.owner_tg_id = u.tg_id AND a.kind = 'podotchet' AND a.active
+  WHERE u.active AND u.role = 'staff'
+  ORDER BY u.full_name`);
 
 // ---------- Hodim kesimida xarajat ----------
 async function byAuthor(from, to, currency) {
@@ -309,5 +318,5 @@ function prevMonth(period) {
 
 module.exports = {
   openingBalance, cashFlow, profitLoss, profitLossCompare,
-  podotchetReport, staffDay, byAuthor, deferred, prevMonth,
+  podotchetReport, staffDay, listStaff, byAuthor, deferred, prevMonth,
 };

@@ -662,24 +662,29 @@ menu(K.MENU.myOps, canEnterOwn, (ctx) => {
 
 // ---------- 📊 Hisobotlar bo'limi ----------
 
-// Rol qaysi hisobotlarni ko'ra oladi
-const canSeeReport = (user) => (need) =>
-  need === 'report' ? canReport(user) : canSeeBook(user);
-
-menu(K.MENU.reports, (u) => canSeeBook(u) || canReport(u), (ctx) => {
+menu(K.MENU.reports, canReport, (ctx) => {
   ctx.session.r = null;
   return ctx.reply('📊 <b>Hisobotlar</b>\n\nQaysi hisobot kerak?',
-    { ...HTML, ...K.reportsMenu(canSeeReport(ctx.user)) });
+    { ...HTML, ...K.reportsMenu() });
+});
+
+// Hodimning o'z hisoboti — faqat o'ziniki, boshqa hodimni ko'ra olmaydi
+menu(K.MENU.myReport, canEnterOwn, (ctx) => {
+  ctx.session.r = {
+    kind: 'pod', daily: true, mine: true,
+    staffId: ctx.user.tg_id, staffName: ctx.user.full_name,
+  };
+  return ctx.reply('📊 <b>Mening hisobotim</b>\n\nQaysi kun uchun?',
+    { ...HTML, ...K.dayPreset('rng') });
 });
 
 // Hisobot turi tanlandi
 bot.action(/^rep:(cf|pl|staff|bal|book)$/, async (ctx) => {
   await ctx.answerCbQuery();
-  const kind = ctx.match[1];
-  const need = (kind === 'cf' || kind === 'pl' || kind === 'staff') ? 'report' : 'book';
-  if (!canSeeReport(ctx.user)(need)) {
+  if (!canReport(ctx.user)) {
     return ctx.answerCbQuery("Bu bo'lim sizga ochiq emas", { show_alert: true }).catch(() => {});
   }
+  const kind = ctx.match[1];
 
   // Kassa qoldig'i — davr so'ralmaydi, hozirgi holat
   if (kind === 'bal') {
@@ -712,9 +717,33 @@ bot.action(/^rcur:(UZS|USD)$/, async (ctx) => {
       { ...HTML, ...K.monthGrid(new Date().getFullYear(), 'rmon') });
   }
   if (r.daily) {
+    // Hodimlar ko'p bo'lsa hammasini birdan ko'rsatish uzun chiqadi —
+    // avval kimni ko'rmoqchi ekanini so'raymiz
+    const staff = await R.listStaff();
+    if (staff.length > 1) {
+      return ctx.editMessageText('👤 Qaysi hodim?', { ...HTML, ...K.staffPicker(staff) });
+    }
     return ctx.editMessageText('📅 Qaysi kun uchun?', { ...HTML, ...K.dayPreset('rng') });
   }
   return ctx.editMessageText('📅 Davrni tanlang:', { ...HTML, ...K.rangePreset('rng') });
+});
+
+// Hodim tanlandi
+bot.action(/^rstaff:(all|\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const r = ctx.session.r;
+  if (!r) return;
+  if (!canReport(ctx.user)) {
+    return ctx.answerCbQuery("Bu bo'lim sizga ochiq emas", { show_alert: true }).catch(() => {});
+  }
+  r.staffId = ctx.match[1] === 'all' ? null : ctx.match[1];
+  r.staffName = null;
+  if (r.staffId) {
+    const u = (await R.listStaff()).find(x => String(x.tg_id) === String(r.staffId));
+    r.staffName = u ? u.full_name : null;
+  }
+  const who = r.staffName ? `👤 ${f.esc(r.staffName)}` : '👥 Hamma hodimlar';
+  return ctx.editMessageText(`${who}\n\n📅 Qaysi kun uchun?`, { ...HTML, ...K.dayPreset('rng') });
 });
 
 // Foyda-zarar: oy tanlandi
@@ -813,11 +842,28 @@ async function renderRange(ctx, from, to) {
   }
 
   if (r.kind === 'pod') {
+    // Hodim o'z hisobotini so'ragan bo'lsa — faqat o'zi, ikkala valyutada.
+    // staffId sessiyadan emas, foydalanuvchining o'zidan olinadi, shuning
+    // uchun soxta so'rov bilan boshqasini ko'rib bo'lmaydi.
+    if (r.mine || canEnterOwn(ctx.user)) {
+      let shown = false;
+      for (const currency of ['UZS', 'USD']) {
+        const rows = await R.staffDay(from, currency, ctx.user.tg_id);
+        if (!rows.some(x => x.active)) continue;
+        await ctx.reply(V.staffDay(rows, from, currency, ctx.user.full_name), HTML);
+        shown = true;
+      }
+      if (!shown) {
+        await ctx.reply(`📊 <b>${f.d(from)}</b> — bu kuni sizda harakat bo'lmagan.`, HTML);
+      }
+      return;
+    }
+
     // Bitta kun so'ralganda batafsil ko'rinish: kun boshi → olindi →
     // sarflandi → kun oxiri. Uzunroq davrda qisqa jamlanma yetarli.
     if (from === to) {
-      const rows = await R.staffDay(from, r.currency);
-      return ctx.editMessageText(V.staffDay(rows, from, r.currency), HTML);
+      const rows = await R.staffDay(from, r.currency, r.staffId || null);
+      return ctx.editMessageText(V.staffDay(rows, from, r.currency, r.staffName), HTML);
     }
     const rows = await R.podotchetReport(from, to, r.currency);
     return ctx.editMessageText(V.podotchet(rows, r.currency, from, to), HTML);

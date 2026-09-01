@@ -31,8 +31,8 @@ va sanalar mos kelmasa tasdiq ekranida ogohlantiradi.
 
 | Rol | Nima qiladi | Nima ko'radi |
 |---|---|---|
-| `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Barcha kassa qoldiqlari, kassa daftari |
-| `staff` | **Faqat o'z qo'lidagi puldan**, **faqat bugungi kun bilan** | **Faqat o'zi kiritgan yozuvlar** va o'z qoldig'i |
+| `cashier` | Kirim, chiqim, hodimlarga pul berish, konvertatsiya | Kiritish paytidagi kassa qoldiqlari |
+| `staff` | **Faqat o'z qo'lidagi puldan**, **faqat bugungi kun bilan** | **Faqat o'ziniki** — kunlik hisoboti, qoldig'i, yozuvlari |
 | `manager` | Hech nima kiritmaydi | **Hammasini** — barcha hisobotlar, qoldiqlar, daftar |
 | `admin` | Hammasi | Hammasi + sozlamalar |
 
@@ -251,9 +251,31 @@ Barcha hisobotlar bitta **📊 Hisobotlar** tugmasi ostida:
 📋 Kassa daftari      — barcha yozuvlar
 ```
 
-Rolga qarab faqat ochiq bo'limlar ko'rinadi: kassirga qoldiq va daftar,
-rahbar va adminga hammasi, hodimga hech biri. Soxta so'rov yuborilsa ham
-serverda tekshiriladi.
+Bu bo'lim **faqat admin va rahbarlarga** ochiq. Kassir va hodim uni ko'ra
+olmaydi — soxta so'rov yuborilsa ham serverda rad etiladi.
+
+### 👤 Hodimlar — kim bo'yicha
+
+Valyutadan keyin **qaysi hodim** so'raladi:
+
+```
+[ 👥 Hammasi ]
+[ 👤 Asadbek Abduqahhorov ]
+[ 👤 Burxon ]
+[ 👤 Faxriddin ]
+```
+
+Bittasi tanlansa faqat o'sha hodim chiqadi, «Hammasi» tanlansa hammasi
+va oxirida jami.
+
+### Hodimning o'z hisoboti
+
+Hodim menyusida **📊 Mening hisobotim** tugmasi bor — kun tanlaydi va
+o'zining o'sha kungi to'liq manzarasini ko'radi (so'm va dollar).
+
+Boshqa hodimni ko'ra olmaydi: hisobot **sessiyadagi tanlovdan emas,
+foydalanuvchining o'zidan** quriladi, shuning uchun soxta so'rov ham
+o'ziniki bilan qaytadi.
 
 ### Davrni tanlash
 
@@ -467,7 +489,7 @@ onix/daily.js        kunlik avtomat hisobot
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (137 ta tekshiruv)
+onix/tests/          testlar (147 ta tekshiruv)
 ```
 
 ## 14. Testlar
