@@ -440,7 +440,99 @@ ketmaydi.
 
 ---
 
-## 10. Tokensiz sinab ko'rish
+## 10. Zaxira nusxa
+
+Baza bitta kompyuterda turadi. Disk buzilsa yoki noutbuk yo'qolsa —
+hamma yozuv bilan birga ketadi. Shuning uchun har kuni bazaning to'liq
+nusxasi olinadi.
+
+### Nima olinadi
+
+`pg_dump` bazani boshdan-oyoq bitta SQL faylga yozadi, fayl siqiladi:
+
+```
+onix-2026-09-03-0300.sql.gz
+```
+
+Ichida hamma narsa bor — jadval tuzilishi, har bir operatsiya
+(o'chirilganlari ham), foydalanuvchilar, kategoriyalar, hisoblar,
+ID lar va hisoblagichlar. Shu bitta fayldan baza **aynan** avvalgi
+holiga qaytadi.
+
+> **Google Sheets zaxira emas.** Sheets jadval bog'lanishlarini
+> yo'qotadi, sanalarni o'z formatiga o'zgartiradi, uzun raqamlarni
+> yaxlitlaydi va tahrirlanadi — bexosdan bosilgan bitta katak
+> zaxirani buzadi. Sheets ko'rish uchun, `.sql.gz` tiklash uchun.
+
+### Qayerga tushadi
+
+Bot papkani shu tartibda tanlaydi:
+
+1. `.env` dagi `ONIX_BACKUP_DIR`
+2. topilsa — Google Drive ichidagi `ONIX zaxira`
+   (`~/Library/CloudStorage/GoogleDrive-…/My Drive`, eski `~/Google Drive`, `G:\My Drive`)
+3. topilmasa — loyiha ichidagi `zaxira/`
+
+Google Drive for Desktop o'rnatilgan bo'lsa sozlash shart emas: fayl
+papkaga tushadi, Drive uni o'zi bulutga ko'taradi. Papka Drive ichida
+bo'lmasa bot ishga tushganda ogohlantiradi.
+
+Fayl avval `.part` nomi bilan yoziladi va tugagachgina o'z nomiga
+o'tadi — Drive yarim faylni ko'tarmaydi.
+
+### Telegramga ham
+
+Nusxa adminlarga Telegramda fayl bo'lib keladi. Bu **ikkinchi, mustaqil
+saqlash joyi**: kompyuter ham, Drive ham ishdan chiqsa fayl chatda
+qoladi. O'chirish uchun `.env` ga `ONIX_BACKUP_TELEGRAM=off`.
+
+### Qachon
+
+Har kuni `ONIX_BACKUP_TIME` da (birlamchi 03:00). Kunlik hisobot bilan
+bir xil mantiq: aniq soatga timer emas, har 10 daqiqada tekshirish.
+Kompyuter o'sha paytda o'chiq bo'lsa nusxa yo'qolmaydi — yonganda
+darhol olinadi, kuniga bir marta.
+
+Nusxa olinmasa admin xabar oladi — zaxira jimgina buzilib yotmasin.
+
+### Necha kun saqlanadi
+
+Oxirgi `ONIX_BACKUP_KEEP` kunlik (birlamchi 30). Chegara fayl soni emas,
+**kun** soni: bir kunda qo'lda bir necha marta nusxa olinsa ham «oxirgi
+30 kun» o'z ma'nosini yo'qotmaydi.
+
+Bir kunlik fayl ~50–200 KB. Bepul 15 GB Google hisobiga yillar davomida
+yetadi.
+
+### Qo'lda
+
+| | |
+|---|---|
+| Botda | `/zaxira` — nusxa oladi va faylni chatga yuboradi (admin) |
+| Terminalda | `npm run onix:zaxira` |
+| Boshqa papkaga | `npm run onix:zaxira -- ~/Desktop` |
+
+### Tiklash
+
+```bash
+gunzip -c "onix-2026-09-03-0300.sql.gz" | psql "$DATABASE_URL"
+```
+
+Fayl ichida `DROP TABLE IF EXISTS` bor — eski jadvallar tozalanib,
+o'rniga nusxadagilari qo'yiladi. Bo'sh bazaga ham, ustiga ham tushadi.
+
+### Sozlamalar
+
+| Kalit | Birlamchi | Nima qiladi |
+|---|---|---|
+| `ONIX_BACKUP` | yoqiq | `off` — zaxira umuman olinmaydi |
+| `ONIX_BACKUP_TIME` | `03:00` | kunlik nusxa soati |
+| `ONIX_BACKUP_DIR` | Google Drive | papka |
+| `ONIX_BACKUP_KEEP` | `30` | necha kunlik saqlansin |
+| `ONIX_BACKUP_TELEGRAM` | yoqiq | `off` — fayl Telegramga yuborilmaydi |
+| `ONIX_PG_DUMP` | o'zi topadi | `pg_dump` ning to'liq yo'li |
+
+## 11. Tokensiz sinab ko'rish
 
 Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
 
@@ -461,7 +553,7 @@ kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
 
 ---
 
-## 11. O'rnatish
+## 12. O'rnatish
 
 ```bash
 npm install
@@ -521,7 +613,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 12. Sozlash buyruqlari (admin)
+## 13. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -546,7 +638,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 13. Fayllar
+## 14. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -557,13 +649,14 @@ onix/views.js        hisobotlarni matn ko'rinishida chizish
 onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
 onix/daily.js        kunlik avtomat hisobot
+onix/backup.js       bazaning zaxira nusxasi
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (165 ta tekshiruv)
+onix/tests/          testlar (212 ta tekshiruv)
 ```
 
-## 14. Testlar
+## 15. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 
@@ -576,5 +669,6 @@ Testlar quyidagilarni tekshiradi: rollar bo'yicha ruxsatlar va hodim uchun
 ma'lumot chegarasi (soxta tugma va qo'lda yozilgan menyu bilan urinishlar), username bo'yicha
 ulanish va tugma bilan tasdiqlash, kiritish sehrgarining
 har bir qadami, ikki va uch pog'onali kategoriyalar, podotchyot hisob-kitobi,
-valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, va **eng asosiysi** —
-yanvarda to'langan xarajat fevral foyda-zararida chiqishi.
+valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, zaxira nusxa olish va
+undan tiklash, va **eng asosiysi** — yanvarda to'langan xarajat fevral
+foyda-zararida chiqishi.

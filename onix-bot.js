@@ -11,6 +11,7 @@ const R  = require('./onix/reports');
 const V  = require('./onix/views');
 const K  = require('./onix/keyboards');
 const daily = require('./onix/daily');
+const backup = require('./onix/backup');
 const f  = require('./onix/format');
 
 const bot = new Telegraf(process.env.ONIX_BOT_TOKEN);
@@ -1178,7 +1179,8 @@ bot.command('help', (ctx) => ctx.reply(
   `<code>/start</code> — boshlash\n` +
   `<code>/menu</code> — menyuni qaytarish\n` +
   `<code>/myid</code> — Telegram ID\n` +
-  `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n\n` +
+  `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
+  `<code>/zaxira</code> — bazaning nusxasini olish\n\n` +
   `<b>Muhim:</b> har operatsiyada ikkita sana bor —\n` +
   `📅 <b>to'lov sanasi</b> → pul oqimiga tushadi\n` +
   `📆 <b>P&amp;L davri</b> → foyda-zararga tushadi\n\n` +
@@ -1264,6 +1266,100 @@ bot.command('kunlik', async (ctx) => {
   for (const text of messages) await ctx.reply(text, HTML);
 });
 
+// ================= Zaxira nusxa =================
+//
+// Har kuni bazaning to'liq nusxasi bitta siqilgan faylga yoziladi va
+// Google Drive papkasiga tushadi — Drive uni o'zi bulutga ko'taradi.
+// Nusxa admin(lar)ga Telegramda ham yuboriladi: bu ikkinchi, mustaqil
+// saqlash joyi — kompyuter ham, Drive ham ishdan chiqsa fayl qoladi.
+//
+// Kunlik hisobot bilan bir xil mantiq: aniq soatga timer emas, har 10
+// daqiqada tekshirish. Kompyuter o'chiq bo'lgan kun nusxa o'tkazib
+// yuborilmaydi — yonganda darhol olinadi, kuniga bir marta.
+
+const BACKUP_KEY = 'backup_last_done';
+const TG_LIMIT = 45 * 1024 * 1024;   // Telegram fayl chegarasi ~50 MB
+
+async function sendBackupFile(res, people) {
+  if (!backup.TO_TELEGRAM || res.size > TG_LIMIT) return 0;
+  const path = require('path');
+  const caption = `🔐 <b>ONIX zaxira nusxasi</b>\n` +
+    `${f.d(backup.today())} · ${backup.humanSize(res.size)}\n\n` +
+    `<i>Bu faylni saqlab qo'ying — bazani to'liq tiklash uchun yetarli.</i>`;
+
+  let sent = 0;
+  for (const person of people) {
+    try {
+      await bot.telegram.sendDocument(person.tg_id,
+        { source: res.file, filename: path.basename(res.file) },
+        { caption, parse_mode: 'HTML' });
+      sent++;
+    } catch (err) {
+      console.error(`Zaxira yuborilmadi (${person.full_name}): ${err.message}`);
+    }
+  }
+  return sent;
+}
+
+const backupRecipients = () => db.listUsers().then(u => u.filter(x => x.role === 'admin'));
+
+async function checkBackup() {
+  if (!backup.ENABLED) return;
+  try {
+    const now = new Date();
+    if (!backup.due(now)) return;
+
+    const target = backup.today(now);
+    if (await db.getSetting(BACKUP_KEY) === target) return;   // bugun olingan
+
+    const res = await backup.run();
+    await db.setSetting(BACKUP_KEY, target);
+    console.log(`🔐 Zaxira: ${res.file} (${backup.humanSize(res.size)}, saqlanayotgan: ${res.days} kun)`);
+
+    const sent = await sendBackupFile(res, await backupRecipients());
+    if (sent) console.log(`   Telegramga yuborildi: ${sent} kishi`);
+  } catch (err) {
+    console.error('Zaxira xatosi:', err.message);
+    // Admin bilib tursin — zaxira jimgina buzilib yotmasin
+    try {
+      for (const person of await backupRecipients()) {
+        await bot.telegram.sendMessage(person.tg_id,
+          `⚠️ <b>Zaxira nusxa olinmadi</b>\n\n<code>${err.message}</code>\n\n` +
+          `Bazangiz ishlayapti, lekin bugungi nusxa yo'q. <code>/zaxira</code> bilan qo'lda urinib ko'ring.`, HTML);
+      }
+    } catch { /* xabar ham ketmadi — logda qoldi */ }
+  }
+}
+
+// Qo'lda nusxa olish
+bot.command('zaxira', async (ctx) => {
+  if (!isAdmin(ctx.user)) return ctx.reply('🔒 Bu buyruq faqat administrator uchun.');
+
+  const wait = await ctx.reply('⏳ Nusxa olinmoqda…');
+  try {
+    const res = await backup.run();
+    await db.setSetting(BACKUP_KEY, backup.today());
+
+    const where = backup.inGoogleDrive(res.dir)
+      ? '☁️ Google Drive ga ko\'tarilmoqda'
+      : '⚠️ Bu papka Google Drive ichida emas — fayl faqat shu kompyuterda';
+
+    await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
+      `✅ <b>Zaxira nusxa tayyor</b>\n\n` +
+      `📄 <code>${require('path').basename(res.file)}</code>\n` +
+      `📦 ${backup.humanSize(res.size)}\n` +
+      `📁 <code>${res.dir}</code>\n` +
+      `${where}\n\n` +
+      `Saqlanmoqda: oxirgi ${backup.KEEP} kunlik nusxa (hozir ${res.days} kun, ${res.total} ta fayl)` +
+      (res.removed ? `\nEskisi o'chirildi: ${res.removed} ta` : ''), HTML);
+
+    await sendBackupFile(res, [ctx.user]);
+  } catch (err) {
+    await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
+      `❌ <b>Zaxira olinmadi</b>\n\n<code>${err.message}</code>`, HTML);
+  }
+});
+
 // ================= Ishga tushirish =================
 
 bot.catch((err, ctx) => {
@@ -1340,6 +1436,16 @@ async function start() {
     console.log(`   📅 Kunlik hisobot: har kuni soat ${DAILY_TIME} da (kechagi kun bo'yicha)`);
     checkDailyReport();
     setInterval(checkDailyReport, 10 * 60 * 1000);
+  }
+  if (backup.ENABLED) {
+    const dir = backup.backupDir();
+    console.log(`   🔐 Zaxira: har kuni soat ${backup.TIME} da → ${dir}`);
+    if (!backup.inGoogleDrive(dir)) {
+      console.log(`      ⚠️  Bu papka Google Drive ichida emas — nusxa faqat shu kompyuterda qoladi.`);
+      console.log(`      Google Drive for Desktop o'rnatilsa bot uni o'zi topadi.`);
+    }
+    checkBackup();
+    setInterval(checkBackup, 10 * 60 * 1000);
   }
   console.log(`   To'xtatish: Control + C`);
 }

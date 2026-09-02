@@ -1,3 +1,7 @@
 node_modules/
 .env
 *.log
+
+# Zaxira nusxalar — bazaning to'liq mazmuni, git ga tushmasin
+zaxira/
+*.sql.gz
