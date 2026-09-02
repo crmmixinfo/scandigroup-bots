@@ -543,7 +543,88 @@ o'rniga nusxadagilari qo'yiladi. Bo'sh bazaga ham, ustiga ham tushadi.
 | `ONIX_BACKUP_TELEGRAM` | yoqiq | `off` — fayl Telegramga yuborilmaydi |
 | `ONIX_PG_DUMP` | o'zi topadi | `pg_dump` ning to'liq yo'li |
 
-## 11. Tokensiz sinab ko'rish
+## 11. Google Sheets
+
+Daftar to'liq jadvalga ko'chiriladi — rahbarlar va buxgalter o'zi
+xohlagancha kesib ko'radi, filtr qo'yadi, Excel ga yuklab oladi.
+
+> **Bu zaxira emas.** Sheets jadval bog'lanishlarini yo'qotadi va
+> tahrirlanadi. Tiklash uchun `.sql.gz` fayl xizmat qiladi — 10-bo'limga
+> qarang. Ikkalasi bir-birining o'rnini bosmaydi.
+
+### To'rtta varaq
+
+| Varaq | Ichida |
+|---|---|
+| **Operatsiyalar** | daftarning o'zi — har yozuv bitta qator, bekor qilinganlari ham |
+| **Qoldiqlar** | hisoblar va hodimlar qo'lidagi pul |
+| **Foyda-zarar** | kategoriyalar × oylar, `period` bo'yicha |
+| **Pul oqimi** | kategoriyalar × oylar, `paid_at` bo'yicha |
+
+Oxirgi ikkitasi bir xil ko'rinadi, lekin **boshqa sanadan** yig'iladi —
+25-yanvarda to'langan fevral arendasi «Pul oqimi» da yanvar ustunida,
+«Foyda-zarar» da fevral ustunida turadi.
+
+Har varaq oxirida `JAMI DAROMAD`, `JAMI XARAJAT`, `FOYDA / ZARAR`
+qatorlari bor — valyuta bo'yicha alohida.
+
+Summalar Sheets ga **son** bo'lib boradi, matn bo'lib emas — ustiga
+darhol formula yozsa bo'ladi.
+
+### Sozlash
+
+Google Cloud, kalit fayl yoki kutubxona kerak emas. Jadvalning o'zida
+kichik skript turadi, bot unga oddiy HTTPS so'rov yuboradi.
+
+1. Google Sheets da yangi jadval oching
+2. **Extensions → Apps Script**
+3. Ichidagini o'chirib, `onix/tools/apps-script.gs` ni to'liq nusxalang
+4. Skript boshidagi `SECRET` ni o'zingiznikiga almashtiring
+5. **Deploy → New deployment → Web app**
+   · Execute as: **Me** · Who has access: **Anyone with the link**
+6. Chiqqan havolani `.env` ga yozing
+
+```
+ONIX_SHEETS_URL=https://script.google.com/macros/s/…/exec
+ONIX_SHEETS_SECRET=…        # skriptdagi SECRET bilan bir xil
+```
+
+Skriptni keyin o'zgartirsangiz — yana **Deploy** bosib mavjud
+joylashtirishni yangilang, aks holda eski versiya ishlab turaveradi.
+
+### Qachon yangilanadi
+
+Har `ONIX_SHEETS_MINUTES` daqiqada (birlamchi 15), lekin **faqat daftar
+o'zgargan bo'lsa**: bot yozuvlar soni va oxirgi o'zgarish vaqtidan iz
+oladi, iz o'zgarmasa so'rov ham yubormaydi.
+
+Jadval har safar **to'liq qayta yoziladi** — qo'shib borilmaydi. Shunda
+bekor qilingan va tuzatilgan yozuvlar ham to'g'ri ko'rinadi. 2000 qatordan
+katta jadval bo'laklarga bo'lib yuboriladi.
+
+### Qo'lda
+
+| | |
+|---|---|
+| Botda | `/sheets` (admin va rahbarlar) |
+| Terminalda | `npm run onix:sheets` |
+
+### Xavfsizlik
+
+Havola — sirning o'zi: uni bilgan har kim jadvalga yozishi mumkin edi.
+Shuning uchun har so'rovda maxfiy so'z boradi va skript uni tekshiradi.
+Havolani ham, maxfiy so'zni ham `.env` dan tashqariga chiqarmang.
+
+### Sozlamalar
+
+| Kalit | Birlamchi | Nima qiladi |
+|---|---|---|
+| `ONIX_SHEETS_URL` | — | Apps Script havolasi; bo'sh bo'lsa Sheets o'chiq |
+| `ONIX_SHEETS_SECRET` | — | skriptdagi `SECRET` bilan bir xil |
+| `ONIX_SHEETS_MINUTES` | `15` | necha daqiqada bir yangilansin (eng kami 5) |
+| `ONIX_SHEETS` | yoqiq | `off` — yangilanmasin |
+
+## 12. Tokensiz sinab ko'rish
 
 Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
 
@@ -564,7 +645,7 @@ kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
 
 ---
 
-## 12. O'rnatish
+## 13. O'rnatish
 
 ```bash
 npm install
@@ -624,7 +705,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 13. Sozlash buyruqlari (admin)
+## 14. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -649,7 +730,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 14. Fayllar
+## 15. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -661,13 +742,15 @@ onix/keyboards.js    Telegram klaviaturalari
 onix/format.js       summa/sana formatlash va o'qish
 onix/daily.js        kunlik avtomat hisobot
 onix/backup.js       bazaning zaxira nusxasi
+onix/sheets.js       Google Sheets ga chiqarish
+onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (220 ta tekshiruv)
+onix/tests/          testlar (273 ta tekshiruv)
 ```
 
-## 15. Testlar
+## 16. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 
@@ -681,5 +764,5 @@ ma'lumot chegarasi (soxta tugma va qo'lda yozilgan menyu bilan urinishlar), user
 ulanish va tugma bilan tasdiqlash, kiritish sehrgarining
 har bir qadami, ikki va uch pog'onali kategoriyalar, podotchyot hisob-kitobi,
 valyuta konvertatsiyasi, qoldiq nazorati, bekor qilish, zaxira nusxa olish va
-undan tiklash, va **eng asosiysi** — yanvarda to'langan xarajat fevral
+undan tiklash, Google Sheets ga chiqarish, va **eng asosiysi** — yanvarda to'langan xarajat fevral
 foyda-zararida chiqishi.

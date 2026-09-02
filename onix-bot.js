@@ -12,6 +12,7 @@ const V  = require('./onix/views');
 const K  = require('./onix/keyboards');
 const daily = require('./onix/daily');
 const backup = require('./onix/backup');
+const sheets = require('./onix/sheets');
 const f  = require('./onix/format');
 
 const bot = new Telegraf(process.env.ONIX_BOT_TOKEN);
@@ -1180,7 +1181,8 @@ bot.command('help', (ctx) => ctx.reply(
   `<code>/menu</code> — menyuni qaytarish\n` +
   `<code>/myid</code> — Telegram ID\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
-  `<code>/zaxira</code> — bazaning nusxasini olish\n\n` +
+  `<code>/zaxira</code> — bazaning nusxasini olish\n` +
+  `<code>/sheets</code> — Google Sheets jadvalini yangilash\n\n` +
   `<b>Muhim:</b> har operatsiyada ikkita sana bor —\n` +
   `📅 <b>to'lov sanasi</b> → pul oqimiga tushadi\n` +
   `📆 <b>P&amp;L davri</b> → foyda-zararga tushadi\n\n` +
@@ -1362,6 +1364,53 @@ bot.command('zaxira', async (ctx) => {
   }
 });
 
+// ================= Google Sheets =================
+//
+// Daftar Google Sheets ga to'liq ko'chiriladi: rahbarlar va buxgalter
+// jadvalda o'zi xohlagancha kesib ko'radi, Excel ga yuklab oladi.
+//
+// Bu zaxira EMAS. Sheets bog'lanishlarni yo'qotadi va tahrirlanadi —
+// tiklash uchun .sql.gz fayl xizmat qiladi (/zaxira).
+
+let sheetsLast = null;      // oxirgi yuborilgan holat izi
+
+async function checkSheets() {
+  if (!sheets.ENABLED) return;
+  try {
+    const now = await sheets.fingerprint();
+    if (now === sheetsLast) return;          // daftar o'zgarmagan
+
+    const res = await sheets.sync();
+    sheetsLast = now;
+    console.log(`📊 Sheets yangilandi: ${Object.entries(res).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+  } catch (err) {
+    console.error('Sheets xatosi:', err.message);
+  }
+}
+
+bot.command('sheets', async (ctx) => {
+  if (!canReport(ctx.user)) return ctx.reply('🔒 Bu bo\'lim sizga ochiq emas.');
+  if (!sheets.URL) {
+    return ctx.reply(
+      `📊 <b>Google Sheets ulanmagan</b>\n\n` +
+      `Ulash uchun <code>.env</code> ga <code>ONIX_SHEETS_URL</code> yozilishi kerak.\n` +
+      `Yo'riqnoma: <code>onix/tools/apps-script.gs</code>`, HTML);
+  }
+
+  const wait = await ctx.reply('⏳ Jadval yangilanmoqda…');
+  try {
+    const res = await sheets.sync();
+    sheetsLast = await sheets.fingerprint();
+    await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
+      `✅ <b>Google Sheets yangilandi</b>\n\n` +
+      Object.entries(res).map(([name, n]) => `📄 ${name} — ${n} qator`).join('\n') +
+      `\n\n<i>Jadval har ${sheets.MINUTES} daqiqada o'zi yangilanadi.</i>`, HTML);
+  } catch (err) {
+    await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
+      `❌ <b>Sheets yangilanmadi</b>\n\n<code>${err.message}</code>`, HTML);
+  }
+});
+
 // ================= Ishga tushirish =================
 
 bot.catch((err, ctx) => {
@@ -1438,6 +1487,11 @@ async function start() {
     console.log(`   📅 Kunlik hisobot: har kuni soat ${DAILY_TIME} da (kechagi kun bo'yicha)`);
     checkDailyReport();
     setInterval(checkDailyReport, 10 * 60 * 1000);
+  }
+  if (sheets.ENABLED) {
+    console.log(`   📊 Google Sheets: har ${sheets.MINUTES} daqiqada (o'zgargan bo'lsa)`);
+    checkSheets();
+    setInterval(checkSheets, sheets.MINUTES * 60 * 1000);
   }
   if (backup.ENABLED) {
     const dir = backup.backupDir();

@@ -6,13 +6,14 @@
     "hr": "node hr-bot.js",
     "onix": "node onix-bot.js",
     "onix:schema": "psql \"$DATABASE_URL\" -f onix-schema.sql",
-    "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js && node onix/tests/backup.test.js",
+    "onix:test": "node onix/tests/reports.test.js && node onix/tests/bot.test.js && node onix/tests/backup.test.js && node onix/tests/sheets.test.js",
     "onix:zaxira": "node onix/tools/backup.js",
     "onix:categories": "node onix/tools/import-categories.js onix/kategoriyalar.txt",
     "onix:users": "node onix/tools/import-users.js onix/jamoa.txt",
     "onix:demo": "node onix/tools/demo.js",
     "onix:check": "node onix/tools/check.js",
-    "onix:setup": "node onix/tools/setup.js"
+    "onix:setup": "node onix/tools/setup.js",
+    "onix:sheets": "node onix/tools/sheets.js"
   },
   "dependencies": {
     "telegraf": "^4.16.0",
