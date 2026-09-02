@@ -459,7 +459,7 @@ Ichida hamma narsa bor — jadval tuzilishi, har bir operatsiya
 ID lar va hisoblagichlar. Shu bitta fayldan baza **aynan** avvalgi
 holiga qaytadi.
 
-> **Google Sheets zaxira emas.** Sheets jadval bog'lanishlarini
+> **Google Sheets (yoki Excel) zaxira emas.** Sheets jadval bog'lanishlarini
 > yo'qotadi, sanalarni o'z formatiga o'zgartiradi, uzun raqamlarni
 > yaxlitlaydi va tahrirlanadi — bexosdan bosilgan bitta katak
 > zaxirani buzadi. Sheets ko'rish uchun, `.sql.gz` tiklash uchun.
@@ -469,16 +469,27 @@ holiga qaytadi.
 Bot papkani shu tartibda tanlaydi:
 
 1. `.env` dagi `ONIX_BACKUP_DIR`
-2. topilsa — Google Drive ichidagi `ONIX zaxira`
-   (`~/Library/CloudStorage/GoogleDrive-…/My Drive`, eski `~/Google Drive`, `G:\My Drive`)
+2. topilsa — bulut papkasi ichidagi `ONIX zaxira`
 3. topilmasa — loyiha ichidagi `zaxira/`
 
-Google Drive for Desktop o'rnatilgan bo'lsa sozlash shart emas: fayl
-papkaga tushadi, Drive uni o'zi bulutga ko'taradi. Papka Drive ichida
-bo'lmasa bot ishga tushganda ogohlantiradi.
+Qaysi bulut o'rnatilgan bo'lsa o'shanisi ishlatiladi — hammasining ishi
+bir xil, papkaga tushgan faylni ko'taradi:
+
+| Xizmat | Yo'l |
+|---|---|
+| OneDrive | `~/Library/CloudStorage/OneDrive-…`, `~/OneDrive - Kompaniya`, `%OneDrive%` |
+| Google Drive | `~/Library/CloudStorage/GoogleDrive-…/My Drive`, `~/Google Drive`, `G:\My Drive` |
+| iCloud Drive | `~/Library/Mobile Documents/com~apple~CloudDocs` |
+| Dropbox | `~/Library/CloudStorage/Dropbox`, `~/Dropbox` |
+| Yandex.Disk | `~/Yandex.Disk` |
+
+Sozlash shart emas: xizmat o'rnatilgan bo'lsa bot papkani o'zi topadi va
+ishga tushganda qaysi bulutga ko'tarilayotganini yozadi. Bulut topilmasa
+ogohlantiradi — bunda ham nusxa olinaveradi, faqat kompyuterda qoladi
+(va Telegramda).
 
 Fayl avval `.part` nomi bilan yoziladi va tugagachgina o'z nomiga
-o'tadi — Drive yarim faylni ko'tarmaydi.
+o'tadi — bulut yarim faylni ko'tarmaydi.
 
 ### Telegramga ham
 
@@ -527,7 +538,7 @@ o'rniga nusxadagilari qo'yiladi. Bo'sh bazaga ham, ustiga ham tushadi.
 |---|---|---|
 | `ONIX_BACKUP` | yoqiq | `off` — zaxira umuman olinmaydi |
 | `ONIX_BACKUP_TIME` | `03:00` | kunlik nusxa soati |
-| `ONIX_BACKUP_DIR` | Google Drive | papka |
+| `ONIX_BACKUP_DIR` | bulut papkasi | papka |
 | `ONIX_BACKUP_KEEP` | `30` | necha kunlik saqlansin |
 | `ONIX_BACKUP_TELEGRAM` | yoqiq | `off` — fayl Telegramga yuborilmaydi |
 | `ONIX_PG_DUMP` | o'zi topadi | `pg_dump` ning to'liq yo'li |
@@ -653,7 +664,7 @@ onix/backup.js       bazaning zaxira nusxasi
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (212 ta tekshiruv)
+onix/tests/          testlar (220 ta tekshiruv)
 ```
 
 ## 15. Testlar

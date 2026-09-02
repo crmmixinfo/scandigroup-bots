@@ -31,44 +31,83 @@ const FILE_RE = /^onix-\d{4}-\d{2}-\d{2}-\d{4}\.sql\.gz$/;
 
 const expandHome = (p) => p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p;
 
-// Google Drive for Desktop papkasini o'zi topadi (macOS va Windows yo'llari)
-function googleDriveDir() {
-  const home = os.homedir();
-  const candidates = [];
+// Bulut papkasini o'zi topadi. Qaysi xizmat o'rnatilgan bo'lsa —
+// Google Drive, OneDrive, iCloud, Dropbox, Yandex — o'shanisi ishlatiladi.
+// Hammasining ishi bir xil: papkaga tushgan faylni bulutga ko'taradi.
 
-  // macOS, yangi versiya: ~/Library/CloudStorage/GoogleDrive-pochta@gmail.com/My Drive
-  const cloud = path.join(home, 'Library', 'CloudStorage');
+const CLOUDS = [
+  { name: 'Google Drive', re: /^GoogleDrive-/, sub: 'My Drive' },
+  { name: 'OneDrive',     re: /^OneDrive([- ]|$)/ },
+  { name: 'Dropbox',      re: /^Dropbox/ },
+  { name: 'Box',          re: /^Box/ },
+];
+
+const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
+function cloudDir() {
+  const home = os.homedir();
+  const found = [];
+
+  // macOS, yangi versiyalar: ~/Library/CloudStorage/<Xizmat>-<hisob>
+  const cloudStorage = path.join(home, 'Library', 'CloudStorage');
   try {
-    for (const entry of fs.readdirSync(cloud)) {
-      if (!entry.startsWith('GoogleDrive-')) continue;
-      candidates.push(path.join(cloud, entry, 'My Drive'), path.join(cloud, entry));
+    for (const entry of fs.readdirSync(cloudStorage).sort()) {
+      const cloud = CLOUDS.find(c => c.re.test(entry));
+      if (!cloud) continue;
+      const base = path.join(cloudStorage, entry);
+      const withSub = cloud.sub && path.join(base, cloud.sub);
+      found.push({ name: cloud.name, dir: withSub && isDir(withSub) ? withSub : base });
     }
   } catch { /* papka yo'q — muhim emas */ }
 
-  // Eski versiya va Windows
-  candidates.push(
-    path.join(home, 'Google Drive', 'My Drive'),
-    path.join(home, 'Google Drive'),
-    'G:\\My Drive',
-  );
+  // Uy papkasidagi eski joylashuvlar va Windows
+  const legacy = [
+    { name: 'Google Drive', dir: path.join(home, 'Google Drive', 'My Drive') },
+    { name: 'Google Drive', dir: path.join(home, 'Google Drive') },
+    { name: 'iCloud Drive', dir: path.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs') },
+    { name: 'Dropbox',      dir: path.join(home, 'Dropbox') },
+    { name: 'Yandex.Disk',  dir: path.join(home, 'Yandex.Disk.localized') },
+    { name: 'Yandex.Disk',  dir: path.join(home, 'Yandex.Disk') },
+    { name: 'Google Drive', dir: 'G:\\My Drive' },
+  ];
+  if (process.env.OneDrive) legacy.unshift({ name: 'OneDrive', dir: process.env.OneDrive });
 
-  return candidates.find(dir => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } }) || null;
+  // Uy papkasida "OneDrive" yoki "OneDrive - Kompaniya"
+  try {
+    for (const entry of fs.readdirSync(home)) {
+      if (/^OneDrive([- ]|$)/.test(entry)) legacy.push({ name: 'OneDrive', dir: path.join(home, entry) });
+    }
+  } catch { /* o'qib bo'lmadi */ }
+
+  found.push(...legacy);
+  return found.find(c => isDir(c.dir)) || null;
 }
 
 // Zaxira qayerga yozilsin:
 //   1. .env dagi ONIX_BACKUP_DIR
-//   2. topilsa — Google Drive ichidagi «ONIX zaxira»
+//   2. topilsa — bulut papkasi ichidagi «ONIX zaxira»
 //   3. topilmasa — loyiha ichidagi zaxira/ papkasi
 function backupDir() {
   if (process.env.ONIX_BACKUP_DIR) return expandHome(process.env.ONIX_BACKUP_DIR.trim());
-  const drive = googleDriveDir();
-  if (drive) return path.join(drive, 'ONIX zaxira');
+  const cloud = cloudDir();
+  if (cloud) return path.join(cloud.dir, 'ONIX zaxira');
   return path.join(__dirname, '..', 'zaxira');
 }
 
-// Papka Google Drive ichidami — foydalanuvchiga aytish uchun
-const inGoogleDrive = (dir = backupDir()) =>
-  /[/\\](Google ?Drive|GoogleDrive-)/i.test(dir);
+// Papka bulut ichidami va qaysi xizmatda — foydalanuvchiga aytish uchun
+const CLOUD_PATTERNS = [
+  [/[/\\](Google ?Drive|GoogleDrive-)/i, 'Google Drive'],
+  [/[/\\]OneDrive([- ]|[/\\]|$)/i,     'OneDrive'],
+  [/com~apple~CloudDocs/i,                 'iCloud Drive'],
+  [/[/\\]Dropbox([/\\]|$)/i,           'Dropbox'],
+  [/[/\\]Yandex\.Disk/i,                 'Yandex.Disk'],
+  [/[/\\]Box([- ]|[/\\]|$)/i,          'Box'],
+];
+
+const cloudName = (dir = backupDir()) =>
+  (CLOUD_PATTERNS.find(([re]) => re.test(dir)) || [])[1] || null;
+
+const inCloud = (dir = backupDir()) => cloudName(dir) !== null;
 
 // ---------- pg_dump ----------
 
@@ -213,6 +252,6 @@ const humanSize = (bytes) =>
 
 module.exports = {
   KEEP, TIME, ENABLED, TO_TELEGRAM,
-  backupDir, googleDriveDir, inGoogleDrive, findPgDump, pgEnv,
+  backupDir, cloudDir, cloudName, inCloud, findPgDump, pgEnv,
   fileName, dayOf, dump, list, prune, run, due, today, humanSize,
 };

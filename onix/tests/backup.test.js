@@ -37,10 +37,20 @@ function testPure() {
 
   console.log('\n— Papka —');
   eq(backup.backupDir(), DIR, 'ONIX_BACKUP_DIR birinchi o\'rinda turadi');
-  ok(backup.inGoogleDrive('/Users/a/Library/CloudStorage/GoogleDrive-x@gmail.com/My Drive/ONIX zaxira'),
-     'macOS Google Drive yo\'li tanildi');
-  ok(backup.inGoogleDrive('/Users/a/Google Drive/ONIX zaxira'), 'eski Google Drive yo\'li tanildi');
-  ok(!backup.inGoogleDrive('/Users/a/Documents/zaxira'), 'oddiy papka Drive deb hisoblanmaydi');
+  const cloudCases = [
+    ['/Users/a/Library/CloudStorage/GoogleDrive-x@gmail.com/My Drive/ONIX zaxira', 'Google Drive'],
+    ['/Users/a/Google Drive/ONIX zaxira',                        'Google Drive'],
+    ['/Users/a/Library/CloudStorage/OneDrive-Personal/ONIX',     'OneDrive'],
+    ['/Users/a/Library/CloudStorage/OneDrive-Scandi Group/ONIX', 'OneDrive'],
+    ['/Users/a/OneDrive - Scandi Group/ONIX',                    'OneDrive'],
+    ['C:\\Users\\a\\OneDrive\\ONIX',                             'OneDrive'],
+    ['/Users/a/Library/Mobile Documents/com~apple~CloudDocs/ONIX', 'iCloud Drive'],
+    ['/Users/a/Dropbox/ONIX zaxira',                             'Dropbox'],
+    ['/Users/a/Yandex.Disk/ONIX',                                'Yandex.Disk'],
+  ];
+  for (const [dir, name] of cloudCases) eq(backup.cloudName(dir), name, `${name} tanildi`);
+  ok(!backup.inCloud('/Users/a/Documents/zaxira'), 'oddiy papka bulut deb hisoblanmaydi');
+  ok(backup.cloudName('/Users/a/Documents/zaxira') === null, 'bulut bo\'lmasa nom qaytmaydi');
 
   console.log('\n— Parol —');
   const env = backup.pgEnv('postgresql://onix:maxfiy%40parol@srv:5433/onixdb');

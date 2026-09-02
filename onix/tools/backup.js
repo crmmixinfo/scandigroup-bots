@@ -8,9 +8,9 @@ const backup = require('../backup');
 (async () => {
   const dir = process.argv[2] || backup.backupDir();
   console.log(`📁 Papka: ${dir}`);
-  if (!backup.inGoogleDrive(dir)) {
-    console.log(`⚠️  Bu papka Google Drive ichida emas — nusxa faqat shu kompyuterda qoladi.`);
-  }
+  const cloud = backup.cloudName(dir);
+  if (cloud) console.log(`☁️  ${cloud} orqali bulutga ko'tariladi`);
+  else console.log(`⚠️  Bu papka bulutda emas — nusxa faqat shu kompyuterda qoladi.`);
   console.log(`⏳ Nusxa olinmoqda…`);
 
   try {

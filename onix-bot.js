@@ -1269,7 +1269,8 @@ bot.command('kunlik', async (ctx) => {
 // ================= Zaxira nusxa =================
 //
 // Har kuni bazaning to'liq nusxasi bitta siqilgan faylga yoziladi va
-// Google Drive papkasiga tushadi — Drive uni o'zi bulutga ko'taradi.
+// bulut papkasiga tushadi (OneDrive, Google Drive, iCloud, Dropbox —
+// qaysi biri o'rnatilgan bo'lsa) — xizmat uni o'zi bulutga ko'taradi.
 // Nusxa admin(lar)ga Telegramda ham yuboriladi: bu ikkinchi, mustaqil
 // saqlash joyi — kompyuter ham, Drive ham ishdan chiqsa fayl qoladi.
 //
@@ -1340,9 +1341,10 @@ bot.command('zaxira', async (ctx) => {
     const res = await backup.run();
     await db.setSetting(BACKUP_KEY, backup.today());
 
-    const where = backup.inGoogleDrive(res.dir)
-      ? '☁️ Google Drive ga ko\'tarilmoqda'
-      : '⚠️ Bu papka Google Drive ichida emas — fayl faqat shu kompyuterda';
+    const cloud = backup.cloudName(res.dir);
+    const where = cloud
+      ? `☁️ ${cloud} ga ko'tarilmoqda`
+      : '⚠️ Bu papka bulutda emas — fayl faqat shu kompyuterda';
 
     await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
       `✅ <b>Zaxira nusxa tayyor</b>\n\n` +
@@ -1440,9 +1442,12 @@ async function start() {
   if (backup.ENABLED) {
     const dir = backup.backupDir();
     console.log(`   🔐 Zaxira: har kuni soat ${backup.TIME} da → ${dir}`);
-    if (!backup.inGoogleDrive(dir)) {
-      console.log(`      ⚠️  Bu papka Google Drive ichida emas — nusxa faqat shu kompyuterda qoladi.`);
-      console.log(`      Google Drive for Desktop o'rnatilsa bot uni o'zi topadi.`);
+    const cloud = backup.cloudName(dir);
+    if (cloud) {
+      console.log(`      ☁️  ${cloud} orqali bulutga ko'tariladi`);
+    } else {
+      console.log(`      ⚠️  Bu papka bulutda emas — nusxa faqat shu kompyuterda qoladi.`);
+      console.log(`      OneDrive, Google Drive, iCloud yoki Dropbox o'rnatilsa bot uni o'zi topadi.`);
     }
     checkBackup();
     setInterval(checkBackup, 10 * 60 * 1000);
