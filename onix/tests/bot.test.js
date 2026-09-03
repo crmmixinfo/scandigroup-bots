@@ -446,6 +446,45 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg('/rename_cat 999999 Yangi', 1);
   ok(last().includes("yo'q"), 'mavjud bo\'lmagan ID rad etildi');
 
+  // ═══ 16. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  console.log('\n─── Daftar: hisob filtri ───');
+  const plastik = await accId('Plastik (sum)');
+  const naqd    = await accId('Naqd (sum)');
+  const bugun   = new Date().toISOString().slice(0, 10);
+
+  // Ikki xil hisobga bittadan yozuv qo'yamiz — filtr ularni ajratishi kerak
+  await db.q(`INSERT INTO onix_operations (type, account_id, category_id, amount, currency, paid_at, period, note, created_by)
+              VALUES ('expense',$1,$3,111111,'UZS',$4::date,date_trunc('month',$4::date),'plastikdan chiqim',1),
+                     ('expense',$2,$3,222222,'UZS',$4::date,date_trunc('month',$4::date),'naqddan chiqim',1)`,
+             [plastik, naqd, ozOvqat, bugun]);
+
+  kb = null; sent = []; await msg(K.MENU.reports, 1);
+  await cb('rep:book', 1);
+  sent = []; kb = null; await cb('rng:today', 1);
+  const pickList = (kb || []).flat().map(b => b.text).join(' | ');
+  ok(last().includes('Qaysi hisob'), 'davrdan keyin hisob so\'raldi');
+  ok(pickList.includes('Hamma hisoblar'), 'hammasi varianti bor');
+  ok(pickList.includes('Plastik (sum)'), 'plastik hisobi ro\'yxatda');
+
+  sent = []; kb = null; await cb(`bacc:${plastik}`, 1);
+  ok(last().includes('plastikdan chiqim'), 'plastik yozuvi chiqdi');
+  ok(!last().includes('naqddan chiqim'), 'naqd yozuvi chiqmadi — filtr ishladi');
+  ok(last().includes('Plastik (sum)'), 'sarlavhada qaysi hisob ekani yozilgan');
+  ok((kb || []).flat().some(b => b.text.includes('Plastik')), 'hisobni almashtirish tugmasi bor');
+
+  sent = []; kb = null; await cb('bacc:pick', 1);
+  ok(last().includes('Qaysi hisob'), 'tugma orqali qayta tanlashga qaytdi');
+
+  sent = []; await cb('bacc:all', 1);
+  ok(last().includes('plastikdan chiqim') && last().includes('naqddan chiqim'),
+     'hammasi tanlanganda ikkalasi ham chiqdi');
+
+  // Hodim soxta tugma bosib ko'rsa ham daftar ochilmaydi
+  sent = []; await cb(`bacc:${plastik}`, 201);
+  const staffSaw = sent.map(x => x.text || '').join(' ');
+  ok(!staffSaw.includes('plastikdan chiqim') && !staffSaw.includes('KASSA DAFTARI'),
+     'hodimga soxta tugmadan ham daftar ochilmadi');
+
   console.log(`\n${fail===0?'🎉':'⚠️'}  ${pass} o'tdi, ${fail} yiqildi`);
   await db.pool.end();
   process.exit(fail ? 1 : 0);

@@ -164,6 +164,15 @@ const rangePreset = (prefix) => Markup.inlineKeyboard([
   CANCEL,
 ]);
 
+// Daftarni hisob bo'yicha filtrlash — hammasi yoki bittasi
+function accountFilter(rows) {
+  const buttons = [[Markup.button.callback("🗂 Hamma hisoblar", 'bacc:all')]];
+  for (const a of rows) {
+    buttons.push([Markup.button.callback(`${a.emoji || '•'} ${a.name}`, `bacc:${a.account_id || a.id}`)]);
+  }
+  return Markup.inlineKeyboard([...buttons, CANCEL]);
+}
+
 // Hodim tanlash — hammasi yoki bittasi
 function staffPicker(rows) {
   const buttons = [[Markup.button.callback('👥 Hammasi', 'rstaff:all')]];
@@ -207,19 +216,27 @@ function calendar(year, month /* 1-12 */) {
 // Daftar sahifalash.
 // O'chirish tugmasi ataylab yo'q: bir bosishda yozuv yo'qolishi xavfli,
 // shuning uchun bekor qilish faqat /del buyrug'i orqali — sabab yozib.
-function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book' } = {}) {
+function bookKeyboard(ops, { page = 0, total = 0, perPage = 8, prefix = 'book', accountLabel } = {}) {
+  const rows = [];
+
   const pages = Math.max(1, Math.ceil(total / perPage));
-  if (pages < 2) return Markup.inlineKeyboard([]);
-  const nav = [];
-  if (page > 0)         nav.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
-  nav.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
-  if (page < pages - 1) nav.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
-  return Markup.inlineKeyboard([nav]);
+  if (pages > 1) {
+    const nav = [];
+    if (page > 0)         nav.push(Markup.button.callback('⬅️', `${prefix}:${page - 1}`));
+    nav.push(Markup.button.callback(`${page + 1}/${pages}`, 'noop'));
+    if (page < pages - 1) nav.push(Markup.button.callback('➡️', `${prefix}:${page + 1}`));
+    rows.push(nav);
+  }
+
+  // Hisobni ro'yxatdan chiqmasdan almashtirish
+  if (accountLabel) rows.push([Markup.button.callback(`🗂 ${accountLabel}`, 'bacc:pick')]);
+
+  return Markup.inlineKeyboard(rows);
 }
 
 module.exports = {
   MENU, mainMenu, accounts, groups, categories, subCategories,
   payDate, period, monthGrid, skipNote, confirm, currencies,
-  reportsMenu, rangePreset, dayPreset, calendar, staffPicker,
+  reportsMenu, rangePreset, dayPreset, calendar, staffPicker, accountFilter,
   bookKeyboard,
 };

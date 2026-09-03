@@ -251,9 +251,15 @@ function operationLine(o) {
   return line;
 }
 
-function book(ops, { from, to, page = 0, total = 0 } = {}) {
-  const head = `<b>📋 KASSA DAFTARI</b>\n📅 ${f.d(from)} — ${f.d(to)} · ${total} ta yozuv\n\n`;
-  if (!ops.length) return head + '<i>Bu davrda operatsiya yo\'q</i>';
+function book(ops, { from, to, page = 0, total = 0, accountName } = {}) {
+  const head = `<b>📋 KASSA DAFTARI</b>\n` +
+    (accountName ? `🗂 ${accountName}\n` : '') +
+    `📅 ${f.d(from)} — ${f.d(to)} · ${total} ta yozuv\n\n`;
+  if (!ops.length) {
+    return head + (accountName
+      ? '<i>Bu davrda shu hisobda operatsiya yo\'q</i>'
+      : '<i>Bu davrda operatsiya yo\'q</i>');
+  }
   return head + ops.map(operationLine).join('\n\n');
 }
 

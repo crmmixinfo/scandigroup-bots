@@ -695,7 +695,8 @@ bot.action(/^rep:(cf|pl|staff|book)$/, async (ctx) => {
   }
   const kind = ctx.match[1];
 
-  ctx.session.r = { kind: kind === 'staff' ? 'pod' : kind, daily: kind === 'staff' };
+  ctx.session.r = { kind: kind === 'staff' ? 'pod' : kind, daily: kind === 'staff',
+                    accountId: null, accountName: null };
 
   if (kind === 'book') {
     return ctx.editMessageText('📋 <b>Kassa daftari</b>\n\nDavrni tanlang:',
@@ -874,16 +875,52 @@ async function renderRange(ctx, from, to) {
 
   if (r.kind === 'book') {
     r.page = 0;
-    return renderBook(ctx, true);
+    return askBookAccount(ctx);
   }
 }
+
+// Daftarni hisob bo'yicha filtrlash. Kassir kunda o'nlab yozuv kiritadi —
+// «plastikdan nima chiqdi» degan savolga sanani varaqlab javob topish
+// og'ir, shuning uchun hisob alohida tanlanadi.
+async function askBookAccount(ctx) {
+  const rows = await db.balances();
+  return ctx.editMessageText(
+    `📋 <b>Kassa daftari</b>\n📅 ${f.d(ctx.session.r.from)} — ${f.d(ctx.session.r.to)}\n\nQaysi hisob?`,
+    { ...HTML, ...K.accountFilter(rows) });
+}
+
+bot.action(/^bacc:(all|pick|\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const r = ctx.session.r;
+  if (!r || r.kind !== 'book') return;
+  if (!canReport(ctx.user)) {
+    return ctx.answerCbQuery("Bu bo'lim sizga ochiq emas", { show_alert: true }).catch(() => {});
+  }
+
+  const choice = ctx.match[1];
+  if (choice === 'pick') return askBookAccount(ctx);
+
+  if (choice === 'all') {
+    r.accountId = null;
+    r.accountName = null;
+  } else {
+    const account = (await db.balances()).find(a => String(a.account_id) === choice);
+    if (!account) return ctx.answerCbQuery('Hisob topilmadi', { show_alert: true }).catch(() => {});
+    r.accountId = account.account_id;
+    r.accountName = account.name;
+  }
+  r.page = 0;
+  return renderBook(ctx, true);
+});
 
 const PER_PAGE = 8;
 
 async function renderBook(ctx, edit = false) {
   const r = ctx.session.r;
   const mine = r.kind === 'myops';
-  const filter = mine ? { createdBy: ctx.user.tg_id } : { from: r.from, to: r.to };
+  const filter = mine
+    ? { createdBy: ctx.user.tg_id }
+    : { from: r.from, to: r.to, accountId: r.accountId || undefined };
 
   const [ops, count] = await Promise.all([
     db.listOperations({ ...filter, limit: PER_PAGE, offset: r.page * PER_PAGE }),
@@ -893,11 +930,12 @@ async function renderBook(ctx, edit = false) {
   const text = mine
     ? `<b>📋 Mening operatsiyalarim</b>\n${count.n} ta yozuv\n\n` +
       (ops.length ? ops.map(V.operationLine).join('\n\n') : '<i>Hali operatsiya kiritmagansiz</i>')
-    : V.book(ops, { from: r.from, to: r.to, page: r.page, total: count.n });
+    : V.book(ops, { from: r.from, to: r.to, page: r.page, total: count.n, accountName: r.accountName });
 
   const kb = K.bookKeyboard(ops, {
     page: r.page, total: count.n, perPage: PER_PAGE,
     prefix: mine ? 'myops' : 'book',
+    accountLabel: mine ? null : (r.accountName || 'Hamma hisoblar'),
   });
   const opts = { ...HTML, ...kb };
   // Tugmadan kelgan bo'lsa xabarni yangilaymiz, menyudan kelgan bo'lsa yangisini yuboramiz

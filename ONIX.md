@@ -336,6 +336,14 @@ KUN OXIRIDA             3 400 000 so'm
 **📋 Kassa daftari** — yozuvlar sahifalab, `paid_at ≠ period` bo'lganda
 qatorda `→ P&L: Fev 2026` belgisi bilan.
 
+Davr tanlangandan keyin **hisob so'raladi**: hamma hisoblar yoki bittasi
+(naqd sum, plastik sum, naqd $, plastik $, hodim podotchyoti). Kassir
+kuniga o'nlab yozuv kiritadi — «plastikdan nima chiqdi» degan savolga
+hammasini varaqlab javob topish og'ir.
+
+Ro'yxat ostidagi `🗂 Plastik (sum)` tugmasi bilan hisobni boshqasiga
+almashtirish mumkin — davrni qayta tanlash shart emas.
+
 ---
 
 ## 9. Kunlik avtomat hisobot
@@ -747,7 +755,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (273 ta tekshiruv)
+onix/tests/          testlar (283 ta tekshiruv)
 ```
 
 ## 16. Testlar
