@@ -141,25 +141,40 @@ function delta(now, before) {
 
 // ================= Qoldiqlar =================
 
+// Nol qoldiqli hisob ko'rsatilmaydi. Ekranda faqat haqiqatan pul turgan
+// joylar qolsin: «$ hisobda 0» degan qatorni har safar o'qishning hojati yo'q.
+// Butun valyuta bo'sh bo'lsa, o'sha bo'lim ham chiqmaydi.
 function balances(rows, title = '💼 KASSA QOLDIG\'I') {
   const byCur = { UZS: [], USD: [] };
   for (const a of rows) (byCur[a.currency] || (byCur[a.currency] = [])).push(a);
 
   const parts = [];
   for (const [cur, list] of Object.entries(byCur)) {
-    if (!list.length) continue;
-    const L = list.map(a => row(`${a.emoji || '•'} ${a.name}`, Number(a.balance), cur));
-    L.push(LINE);
-    L.push(row('JAMI', list.reduce((s, a) => s + Number(a.balance), 0), cur));
+    const bor = list.filter(a => Number(a.balance) !== 0);
+    if (!bor.length) continue;
+
+    const L = bor.map(a => row(`${a.emoji || '•'} ${a.name}`, Number(a.balance), cur));
+    // Bitta hisob qolgan bo'lsa JAMI qatori shu raqamni takrorlaydi — keraksiz
+    if (bor.length > 1) {
+      L.push(LINE);
+      L.push(row('JAMI', bor.reduce((s, a) => s + Number(a.balance), 0), cur));
+    }
     parts.push(`${curLabel(cur)}\n<pre>${f.esc(L.join('\n'))}</pre>`);
   }
-  return `<b>${title}</b>\n\n` + (parts.join('\n') || '<i>Hisoblar yo\'q</i>');
+  if (!parts.length) return `<b>${title}</b>\n\n<i>Hamma hisob bo'sh — qoldiq yo'q.</i>`;
+  return `<b>${title}</b>\n\n` + parts.join('\n');
 }
 
 // ================= Podotchyot =================
 
 function podotchet(rows, currency, from, to) {
-  if (!rows.length) return '<i>Podotchyot hisoblari yo\'q</i>';
+  // Harakati ham, qoldig'i ham nol bo'lgan hodim ro'yxatni uzaytirmaydi
+  rows = rows.filter(s => s.received || s.spent || s.returned || s.balance);
+  if (!rows.length) {
+    return `<b>👛 PODOTCHYOT — hisobdor pul</b>\n` +
+           `📅 ${f.d(from)} — ${f.d(to)} · ${curLabel(currency)}\n\n` +
+           `<i>Bu davrda harakat bo'lmagan.</i>`;
+  }
   const L = [];
   for (const s of rows) {
     L.push(f.shortName(s.full_name));

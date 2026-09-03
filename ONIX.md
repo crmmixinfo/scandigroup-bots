@@ -245,6 +245,13 @@ izsiz yo'qolmaydi.
 
 ## 8. Hisobotlar
 
+> **Nol ko'rsatilmaydi.** Qoldiq va podotchyot hisobotlarida pul turmagan
+> hisob va harakat qilmagan hodim chiqmaydi. Butun valyuta bo'sh bo'lsa —
+> o'sha bo'lim ham chiqmaydi: «$ hisobda 0» degan qatorni har kuni
+> o'qishning hojati yo'q. Bitta hisob qolganda `JAMI` qatori ham
+> tushiriladi — u shu raqamni takrorlagan bo'lardi. Hammasi bo'sh bo'lsa
+> «Hamma hisob bo'sh» deb yoziladi.
+
 **📊 Kassa qoldig'i** — asosiy menyuda, bir bosishda. Eng ko'p kerak
 bo'ladigan ma'lumot bo'lgani uchun hisobotlar ichiga yashirilmagan.
 Admin, kassir va rahbar ko'radi.
@@ -809,7 +816,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (297 ta tekshiruv)
+onix/tests/          testlar (315 ta tekshiruv)
 ```
 
 ## 17. Testlar

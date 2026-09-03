@@ -77,14 +77,16 @@ async function kassaSection(date, currency) {
   const L = [];
   const total = (list, field = 'amount') => list.reduce((a, r) => a + Number(r[field]), 0);
 
-  // Qoldiqlar jadvali — kassa daftari sahifasidek
+  // Qoldiqlar jadvali — kassa daftari sahifasidek.
+  // Nol turgan hisob ko'rsatilmaydi: xabar qisqaroq va o'qilishi osonroq.
   const balanceBlock = (title, list) => {
+    const bor = list.filter(r => Number(r.balance) !== 0);
     const out = [title];
-    for (const r of list) {
-      if (Number(r.balance) === 0 && list.length > 2) continue;
+    for (const r of bor) {
       out.push(V.row(`${r.emoji || '•'} ${r.name}`, Number(r.balance), currency, { indent: 1 }));
     }
-    out.push(V.row('JAMI', sum(list), currency, { indent: 1 }));
+    // JAMI faqat bir nechta hisob bo'lganda ma'noli — bittasida u takror
+    if (bor.length !== 1) out.push(V.row('JAMI', sum(list), currency, { indent: 1 }));
     return out;
   };
 

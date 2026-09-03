@@ -488,7 +488,72 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   eq((await db.countOperations({ from: '2026-03-05', to: '2026-03-05' })).n >= 1, 'true',
      'tiklangan yozuv daftarga qaytdi');
 
-  // ═══ 17. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  // ═══ 17. NOL QOLDIQ KO'RSATILMAYDI ═══
+  console.log('\n─── Nol qatorlar yashiriladi ───');
+
+  sent = []; await msg(K.MENU.balance, 1);
+  const qoldiqMatn = last();
+  ok(qoldiqMatn.includes("KASSA QOLDIG'I"), 'qoldiq hisoboti chiqdi');
+
+  // Bazada USD hisoblari bor, lekin ularda pul yo'q
+  const usdBor = (await db.balances({ currency: 'USD' })).some(a => Number(a.balance) !== 0);
+  ok(!usdBor, 'sinovda USD hisoblari bo\'sh');
+  ok(!qoldiqMatn.includes('AQSH dollari') && !qoldiqMatn.includes('$'),
+     'bo\'sh USD bo\'limi umuman chiqmadi');
+
+  // Nol turgan sum hisobi ham ro'yxatda yo'q
+  const nolSum = (await db.balances({ currency: 'UZS' })).filter(a => Number(a.balance) === 0);
+  for (const a of nolSum) {
+    ok(!qoldiqMatn.includes(a.name), `nol qoldiqli «${a.name}» ko\'rsatilmadi`);
+  }
+
+  // Pul turgan hisob esa albatta ko'rinadi
+  const pulBor = (await db.balances({ currency: 'UZS' })).filter(a => Number(a.balance) !== 0);
+  ok(pulBor.length > 0, 'sum hisoblarida pul bor');
+  for (const a of pulBor) {
+    ok(qoldiqMatn.includes(a.name), `pul turgan «${a.name}» ko\'rindi`);
+  }
+
+  // Hammasi nol bo'lganda tushunarli xabar chiqadi
+  const V2 = require('../views');
+  const bosh = V2.balances([
+    { name: 'Naqd (sum)',  currency: 'UZS', balance: 0, emoji: '💵' },
+    { name: 'Plastik ($)', currency: 'USD', balance: 0, emoji: '💳' },
+  ]);
+  ok(bosh.includes("Hamma hisob bo'sh"), 'hammasi nol bo\'lsa tushunarli xabar');
+  ok(!bosh.includes('JAMI'), 'bo\'sh holatda JAMI qatori yo\'q');
+
+  // Bitta hisob qolganda JAMI takrorlanmaydi
+  const bitta = V2.balances([
+    { name: 'Naqd (sum)',  currency: 'UZS', balance: 500000, emoji: '💵' },
+    { name: 'Plastik (sum)', currency: 'UZS', balance: 0, emoji: '💳' },
+  ]);
+  ok(bitta.includes('Naqd (sum)'), 'pul turgan hisob chiqdi');
+  ok(!bitta.includes('Plastik (sum)'), 'nol turgan hisob chiqmadi');
+  ok(!bitta.includes('JAMI'), 'bitta hisob qolganda JAMI takrorlanmadi');
+
+  // Ikkita hisobda pul bo'lsa JAMI kerak
+  const ikkita = V2.balances([
+    { name: 'Naqd (sum)',    currency: 'UZS', balance: 500000, emoji: '💵' },
+    { name: 'Plastik (sum)', currency: 'UZS', balance: 300000, emoji: '💳' },
+  ]);
+  ok(ikkita.includes('JAMI'), 'ikkita hisobda JAMI qatori bor');
+
+  // Podotchyotda ham harakatsiz hodim ro'yxatni uzaytirmaydi
+  const podBosh = V2.podotchet(
+    [{ full_name: 'Bo\'sh Hodim', received: 0, spent: 0, returned: 0, balance: 0 }],
+    'UZS', '2026-03-01', '2026-03-31');
+  ok(podBosh.includes("harakat bo'lmagan"), 'harakatsiz hodim ro\'yxatdan chiqdi');
+  ok(!podBosh.includes("Bo'sh Hodim"), 'nomi ham ko\'rsatilmadi');
+
+  const podBor = V2.podotchet([
+    { full_name: 'Bo\'sh Hodim', received: 0, spent: 0, returned: 0, balance: 0 },
+    { full_name: 'Faol Hodim', received: 900000, spent: 400000, returned: 0, balance: 500000 },
+  ], 'UZS', '2026-03-01', '2026-03-31');
+  ok(podBor.includes('Faol'), 'faol hodim ko\'rindi');
+  ok(!podBor.includes("Bo'sh"), 'harakatsiz hodim ko\'rinmadi');
+
+  // ═══ 18. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');
   const plastik = await accId('Plastik (sum)');
   const naqd    = await accId('Naqd (sum)');
