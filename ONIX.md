@@ -187,6 +187,27 @@ yo'qolmaydi.
 
 ---
 
+### Bo'sh hisoblar taklif qilinmaydi
+
+Pul chiqadigan qadamlarda — **chiqim**, **hodimga pul berish**,
+**konvertatsiya** — qoldig'i nol bo'lgan hisob ro'yxatda ko'rinmaydi.
+Bo'sh kassadan pul chiqmaydi, uni har safar o'qib o'tishning hojati yo'q.
+
+Uchta istisno bor:
+
+| Holat | Nega ko'rsatiladi |
+|---|---|
+| **Kirim** | Bo'sh kassaga pul kirishi butunlay normal |
+| **Boshlang'ich qoldiq** | U aynan bo'sh hisob uchun kiritiladi |
+| **Manfiy qoldiq** | Nol emas — bu xato belgisi, yashirish zarar qiladi |
+
+Hech qayerda pul bo'lmasa hammasi ko'rsatiladi: yangi o'rnatilgan tizimda
+foydalanuvchi tanlashga hisob topmay qolmasin.
+
+Tugmalar ham, kelgan javobni tekshirish ham bitta ro'yxatdan
+(`allowedSourceAccounts`) oziqlanadi — shuning uchun soxta tugma bosib
+yashirilgan hisobni tanlab bo'lmaydi.
+
 ## 7. Boshlang'ich qoldiq
 
 Tizimni ishga tushirganda kassalarda allaqachon pul bo'ladi. Uni kiritish:
@@ -816,7 +837,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (315 ta tekshiruv)
+onix/tests/          testlar (337 ta tekshiruv)
 ```
 
 ## 17. Testlar

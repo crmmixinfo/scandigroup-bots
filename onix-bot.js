@@ -292,15 +292,31 @@ async function ask(ctx) {
 // Foydalanuvchi shu qadamda tanlashi mumkin bo'lgan manba hisoblari.
 // Tugmalar ham, kelgan javobni tekshirish ham shu ro'yxatga tayanadi —
 // shuning uchun soxta tugma bosib boshqa hisobni tanlab bo'lmaydi.
+// Puli tugagan hisobdan pul chiqmaydi — chiqim, podotchyot berish va
+// konvertatsiyada bo'sh hisoblar ro'yxatda ko'rinmaydi. Manfiy qoldiq esa
+// ko'rinadi: u xato belgisi, yashirish kerak emas.
+// Hech qayerda pul bo'lmasa hammasi ko'rsatiladi — aks holda yangi
+// o'rnatilgan tizimda foydalanuvchi tanlashga hisob topmay qolardi.
+const SPENDING_FLOWS = new Set(['expense', 'podotchet', 'convert']);
+
+function hideEmpty(rows, flow) {
+  if (!SPENDING_FLOWS.has(flow)) return rows;
+  const bor = rows.filter(a => Number(a.balance) !== 0);
+  return bor.length ? bor : rows;
+}
+
 async function allowedSourceAccounts(ctx) {
+  const flow = wiz(ctx) && wiz(ctx).flow;
+
   // Hodim faqat o'z podotchyot pulidan sarflaydi
   if (canEnterOwn(ctx.user)) {
-    return db.balances({ kind: 'podotchet', ownerTgId: ctx.user.tg_id });
+    const own = await db.balances({ kind: 'podotchet', ownerTgId: ctx.user.tg_id });
+    return hideEmpty(own, 'expense');
   }
   // Boshlang'ich qoldiq hodimlarning qo'lidagi pulga ham kiritiladi —
   // tizim ishga tushganda ularda allaqachon avans bo'lishi mumkin
-  if (wiz(ctx) && wiz(ctx).flow === 'opening') return db.balances();
-  return db.balances({ kind: 'kassa' });
+  if (flow === 'opening') return db.balances();
+  return hideEmpty(await db.balances({ kind: 'kassa' }), flow);
 }
 
 // Qabul qiluvchi hisob: podotchyot berishda hodimlar, konvertatsiyada kassalar

@@ -553,7 +553,74 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   ok(podBor.includes('Faol'), 'faol hodim ko\'rindi');
   ok(!podBor.includes("Bo'sh"), 'harakatsiz hodim ko\'rinmadi');
 
-  // ═══ 18. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  // ═══ 18. CHIQIMDA BO'SH HISOBLAR KO'RSATILMAYDI ═══
+  console.log('\n─── Chiqimda bo\'sh hisoblar yashiriladi ───');
+
+  const kassalar = await db.balances({ kind: 'kassa' });
+  const pulli = kassalar.filter(a => Number(a.balance) !== 0);
+  const boshKassa  = kassalar.filter(a => Number(a.balance) === 0);
+  ok(pulli.length > 0 && boshKassa.length > 0,
+     `sinovda pulli (${pulli.length}) va bo'sh (${boshKassa.length}) kassalar bor`);
+
+  const tugmalar = () => (kb || []).flat().map(b => b.text).join(' | ');
+
+  kb = null; sent = []; await msg(K.MENU.expense, 101);
+  const chiqimTugma = tugmalar();
+  for (const a of pulli) ok(chiqimTugma.includes(a.name), `chiqimda pulli «${a.name}» bor`);
+  for (const a of boshKassa)  ok(!chiqimTugma.includes(a.name), `chiqimda bo'sh «${a.name}» yo'q`);
+  await msg('/cancel', 101);
+
+  // Kirimda esa hammasi ko'rinadi — bo'sh kassaga pul kirishi normal
+  kb = null; sent = []; await msg(K.MENU.income, 101);
+  const kirimTugma = tugmalar();
+  for (const a of kassalar) ok(kirimTugma.includes(a.name), `kirimda «${a.name}» bor`);
+  await msg('/cancel', 101);
+
+  // Hodimga pul berishda ham bo'sh kassa taklif qilinmaydi
+  kb = null; sent = []; await msg(K.MENU.podotchet, 101);
+  const podTugma = tugmalar();
+  for (const a of boshKassa) ok(!podTugma.includes(a.name), `pul berishda bo'sh «${a.name}» yo'q`);
+  await msg('/cancel', 101);
+
+  // Yashirilgan hisobni soxta tugma bilan tanlab bo'lmaydi:
+  // tugmalar ham, tekshiruv ham bitta ro'yxatdan oziqlanadi
+  sent = []; await msg(K.MENU.expense, 101);
+  await cb(`acc:${boshKassa[0].account_id}`, 101);
+  const soxta = sent.map(x => x.text || '').join(' ');
+  ok(!soxta.includes('guruh') && !soxta.includes('Guruh'),
+     'soxta tugma bilan bo\'sh hisobdan chiqim boshlanmadi');
+  await msg('/cancel', 101);
+
+  // Boshlang'ich qoldiqda hammasi kerak — u aynan bo'sh hisob uchun
+  kb = null; sent = []; await cb('openbal', 1);
+  const openTugma = tugmalar();
+  for (const a of boshKassa) ok(openTugma.includes(a.name), `boshlang'ich qoldiqda «${a.name}» bor`);
+  await msg('/cancel', 1);
+
+  // Hech qayerda pul bo'lmasa hammasi ko'rsatiladi — tanlash imkonsiz
+  // bo'lib qolmasin. Vaqtincha hamma kassani nolga tushiramiz.
+  const saqlangan = await db.all(
+    `SELECT o.id FROM onix_operations o
+       JOIN onix_accounts a ON a.id = o.account_id
+      WHERE a.kind <> 'podotchet' AND o.deleted_at IS NULL`);
+  await db.q(`UPDATE onix_operations SET deleted_at = NOW() WHERE id = ANY($1)`,
+             [saqlangan.map(r => r.id)]);
+  const hammasiNol = (await db.balances({ kind: 'kassa' })).every(a => Number(a.balance) === 0);
+  ok(hammasiNol, 'vaqtincha hamma kassa nolga tushdi');
+
+  kb = null; sent = []; await msg(K.MENU.expense, 101);
+  const nolTugma = tugmalar();
+  for (const a of kassalar) {
+    ok(nolTugma.includes(a.name), `hammasi nol bo'lganda «${a.name}» baribir ko'rindi`);
+  }
+  await msg('/cancel', 101);
+
+  await db.q(`UPDATE onix_operations SET deleted_at = NULL WHERE id = ANY($1)`,
+             [saqlangan.map(r => r.id)]);
+  eq((await db.balances({ kind: 'kassa' })).filter(a => Number(a.balance) !== 0).length,
+     pulli.length, 'qoldiqlar avvalgi holiga qaytdi');
+
+  // ═══ 19. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');
   const plastik = await accId('Plastik (sum)');
   const naqd    = await accId('Naqd (sum)');
