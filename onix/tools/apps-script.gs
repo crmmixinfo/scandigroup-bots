@@ -63,11 +63,19 @@ function doPost(e) {
       sheet.getRange(start, 1, rows.length, width).setValues(rows);
     }
 
-    // Oxirgi bo'lak — ortiqcha bo'sh qatorlarni olib tashlaymiz
+    // Oxirgi bo'lak — ortiqcha bo'sh qatorlarni olib tashlab, filtr qo'yamiz
     if (data.done) {
       var used = Math.max(sheet.getLastRow(), 1);
       if (sheet.getMaxRows() > used + 1) sheet.deleteRows(used + 1, sheet.getMaxRows() - used - 1);
       if (sheet.getLastColumn() > 0) sheet.autoResizeColumns(1, sheet.getLastColumn());
+
+      // Filtr har safar qayta qo'yiladi: qatorlar soni o'zgargani uchun
+      // eski filtr yangi yozuvlarni qamrab olmay qolardi.
+      var old = sheet.getFilter();
+      if (old) old.remove();
+      if (used > 1 && sheet.getLastColumn() > 0) {
+        sheet.getRange(1, 1, used, sheet.getLastColumn()).createFilter();
+      }
     }
 
     return ok({ sheet: data.sheet, rows: rows.length });

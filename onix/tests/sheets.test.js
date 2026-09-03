@@ -148,6 +148,11 @@ async function seed(db) {
     eq(bekor[14], 'ha', 'bekor qilingan yozuv belgilangan');
     eq(bekor[15], 'sinov uchun bekor qilindi', 'bekor qilish sababi ham bor');
 
+    // Eng yangisi tepada — oxirgi kiritilganini varaqlab izlash shart emas
+    const sanalar = ops.map(r => r[1]);
+    eq(sanalar[0], [...sanalar].sort().reverse()[0], 'eng kech to\'lov sanasi birinchi qatorda');
+    ok(sanalar.every((d, i) => i === 0 || sanalar[i - 1] >= d), 'sanalar kamayish tartibida');
+
     const otkazma = ops.find(r => r[3] === 'O\'tkazma');
     ok(otkazma, 'o\'tkazma ham jadvalga tushdi');
     ok(otkazma[7], 'o\'tkazmada qabul qiluvchi hisob ko\'rsatilgan');

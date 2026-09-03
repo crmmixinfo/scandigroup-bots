@@ -579,6 +579,24 @@ qatorlari bor — valyuta bo'yicha alohida.
 Summalar Sheets ga **son** bo'lib boradi, matn bo'lib emas — ustiga
 darhol formula yozsa bo'ladi.
 
+«Operatsiyalar» varag'ida eng yangi yozuv tepada turadi, va har
+yangilanishdan keyin sarlavhaga **filtr** qo'yiladi (qatorlar soni
+o'zgargani uchun filtr qayta chiziladi — eski filtr yangi yozuvlarni
+qamrab olmay qolardi).
+
+### O'z ko'rinishingizni yasash
+
+Jadval har safar to'liq qayta yoziladi, shuning uchun varaqning **ichida**
+qo'yilgan saralash keyingi yangilanishda yo'qoladi. O'zgarmaydigan
+ko'rinish kerak bo'lsa — **yangi varaq** ochib formula yozing:
+
+```
+=SORT(Operatsiyalar!A2:P; 6; FALSE)          summasi bo'yicha kamayish
+=QUERY(Operatsiyalar!A:P; "select * where G='Plastik (sum)'")
+```
+
+Bunday varaqqa bot tegmaydi, lekin ma'lumot o'zi yangilanib turadi.
+
 ### Sozlash
 
 Google Cloud, kalit fayl yoki kutubxona kerak emas. Jadvalning o'zida
@@ -755,7 +773,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (283 ta tekshiruv)
+onix/tests/          testlar (287 ta tekshiruv)
 ```
 
 ## 16. Testlar
