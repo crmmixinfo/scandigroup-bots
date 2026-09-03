@@ -650,7 +650,27 @@ Havolani ham, maxfiy so'zni ham `.env` dan tashqariga chiqarmang.
 | `ONIX_SHEETS_MINUTES` | `15` | necha daqiqada bir yangilansin (eng kami 5) |
 | `ONIX_SHEETS` | yoqiq | `off` — yangilanmasin |
 
-## 12. Tokensiz sinab ko'rish
+## 12. Terminalsiz ishga tushirish (macOS)
+
+Har safar Terminal ochib buyruq yozish shart emas. Loyiha ichida ikkita
+ikki marta bosiladigan fayl bor:
+
+| Fayl | Nima qiladi |
+|---|---|
+| `onix/tools/ONIX-ishga-tushirish.command` | Terminalni o'zi ochadi va botni yoqadi |
+| `onix/tools/ONIX-yangilash.command` | Yangi kodni oladi, kutubxonalarni tekshiradi, keyin botni yoqadi |
+
+**Ish stoliga chiqarish:** faylni o'ng tugma bilan bosib
+«Создать псевдоним» (Make Alias) tanlang, yorliqni ish stoliga suring.
+Yorliq orqali ochilganda ham skript asl papkasini topadi.
+
+Faylning o'zini boshqa joyga **ko'chirmang** — u o'zini loyihaga nisbatan
+qidiradi. Ko'chirilgan bo'lsa tushunarli xato beradi.
+
+Bot to'xtaganda oyna darrov yopilmaydi — xato yozuvini o'qib olish
+mumkin bo'lsin.
+
+## 13. Tokensiz sinab ko'rish
 
 Telegram tokeni olishdan oldin butun tizimni terminalda ko'rish mumkin:
 
@@ -671,7 +691,7 @@ kelgusi oyga yoziladigan to'lov, hodimning chegarasi, va rahbar hisobotlari.
 
 ---
 
-## 13. O'rnatish
+## 14. O'rnatish
 
 ```bash
 npm install
@@ -731,7 +751,7 @@ Har qanday usulda `staff` qo'shilsa, unga ikkita podotchyot hisobi
 
 ---
 
-## 14. Sozlash buyruqlari (admin)
+## 15. Sozlash buyruqlari (admin)
 
 | Buyruq | Vazifasi |
 |---|---|
@@ -756,7 +776,7 @@ kim va nima sababdan bekor qilgani saqlanadi.
 
 ---
 
-## 15. Fayllar
+## 16. Fayllar
 
 ```
 onix-bot.js          bot: menyu, kiritish sehrgari, hisobot oqimi, admin buyruqlari
@@ -770,13 +790,13 @@ onix/daily.js        kunlik avtomat hisobot
 onix/backup.js       bazaning zaxira nusxasi
 onix/sheets.js       Google Sheets ga chiqarish
 onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
-onix/tools/          yuklovchilar (kategoriya, jamoa) va demo
+onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
 onix/tests/          testlar (287 ta tekshiruv)
 ```
 
-## 16. Testlar
+## 17. Testlar
 
 Testlar bo'sh PostgreSQL bazasini talab qiladi:
 
