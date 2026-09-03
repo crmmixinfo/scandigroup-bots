@@ -972,6 +972,7 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<code>/del_cat &lt;id&gt;</code> — istalgan darajani yashiradi\n\n` +
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
+  `<code>/tikla &lt;id&gt;</code> — bekor qilinganni qaytarish\n` +
   `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>\n\n` +
   `<b>Kunlik hisobot</b>\n` +
   `Har kuni soat ${DAILY_TIME} da admin va rahbarlarga avtomat yuboriladi.\n` +
@@ -1211,6 +1212,27 @@ bot.command('del', async (ctx) => {
   return ctx.reply(
     `🗑 <b>Bekor qilindi</b>  <code>#${op.id}</code>\n\n${V.operationLine(op)}\n\n` +
     `Sabab: <i>${f.esc(reason.join(' '))}</i>`, HTML);
+});
+
+// Bekor qilingan yozuvni qaytarish — xato bekor qilish ham bo'ladi
+bot.command('tikla', async (ctx) => {
+  const [id] = args(ctx);
+  if (!id) return ctx.reply('Foydalanish: <code>/tikla 42</code>', HTML);
+
+  const op = await db.getOperation(parseInt(id, 10));
+  if (!op) return ctx.reply('❌ Bunday yozuv yo\'q.');
+  if (!op.deleted_at) return ctx.reply('ℹ️ Bu yozuv bekor qilinmagan — tiklash shart emas.');
+  if (!mayDelete(ctx.user, op)) {
+    return ctx.reply('🔒 Faqat o\'z yozuvingizni tiklay olasiz.');
+  }
+
+  const back = await db.restore(op.id, ctx.user.tg_id);
+  if (!back) return ctx.reply('⚠️ Tiklab bo\'lmadi — yozuvni qayta tekshiring.');
+
+  const full = await db.getOperation(op.id);
+  return ctx.reply(
+    `♻️ <b>Tiklandi</b>  <code>#${op.id}</code>\n\n${V.operationLine(full)}\n\n` +
+    `<i>Yozuv yana hisobotlarga va qoldiqqa qo'shildi.</i>`, HTML);
 });
 
 bot.command('help', (ctx) => ctx.reply(

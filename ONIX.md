@@ -336,6 +336,22 @@ KUN OXIRIDA             3 400 000 so'm
 **📋 Kassa daftari** — yozuvlar sahifalab, `paid_at ≠ period` bo'lganda
 qatorda `→ P&L: Fev 2026` belgisi bilan.
 
+### Bekor qilish va tiklash
+
+`/del 42 sabab` yozuvni bekor qiladi: u hisobotlardan, qoldiqdan va
+foyda-zarardan chiqadi, lekin bazadan **o'chmaydi** — kim, qachon va
+nega bekor qilgani saqlanadi.
+
+`/tikla 42` uni qaytaradi. Bekor qilish ham xato bo'lishi mumkin.
+Tiklashda `deleted_at` tozalanadi (yozuv yana hisobga kiradi), ammo
+`deleted_by` va `delete_reason` joyida qoladi — «bir marta bekor
+qilingan edi» degani daftardan yo'qolmaydi. Qo'shimcha `restored_at`
+va `restored_by` kim tiklaganini yozadi.
+
+Ikkalasida ham qoida bir xil: admin har qanday yozuvni, hodim faqat
+o'zinikini. Google Sheets dagi «Holati» ustuni uchta qiymat oladi —
+bo'sh, `ha` (bekor qilingan), `tiklangan`.
+
 Davr tanlangandan keyin **hisob so'raladi**: hamma hisoblar yoki bittasi
 (naqd sum, plastik sum, naqd $, plastik $, hodim podotchyoti). Kassir
 kuniga o'nlab yozuv kiritadi — «plastikdan nima chiqdi» degan savolga
@@ -793,7 +809,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (287 ta tekshiruv)
+onix/tests/          testlar (297 ta tekshiruv)
 ```
 
 ## 17. Testlar

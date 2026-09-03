@@ -210,8 +210,15 @@ const getOperation = (id) =>
        WHERE o.id = $1`, [id]);
 
 const softDelete = (id, byTgId, reason) =>
-  one(`UPDATE onix_operations SET deleted_at = NOW(), deleted_by = $2, delete_reason = $3
+  one(`UPDATE onix_operations SET deleted_at = NOW(), deleted_by = $2, delete_reason = $3,
+                                  restored_at = NULL, restored_by = NULL
        WHERE id = $1 AND deleted_at IS NULL RETURNING *`, [id, byTgId, reason || null]);
+
+// Bekor qilingan yozuvni qaytarish. deleted_by va delete_reason o'chirilmaydi:
+// yozuv qachon, kim tomonidan bekor qilingani va nega — tarixda qoladi.
+const restore = (id, byTgId) =>
+  one(`UPDATE onix_operations SET deleted_at = NULL, restored_at = NOW(), restored_by = $2
+       WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *`, [id, byTgId]);
 
 // Kassa daftari — sana oralig'i / muallif / hisob bo'yicha
 function listOperations({ from, to, createdBy, accountId, limit = 30, offset = 0 } = {}) {
@@ -260,5 +267,5 @@ module.exports = {
   getSetting, setSetting,
   listAccounts, getAccount, balances,
   listGroups, listChildren, hasChildren, getCategory, addCategory, deactivateCategory, categoryTree,
-  addOperation, getOperation, softDelete, listOperations, countOperations,
+  addOperation, getOperation, softDelete, restore, listOperations, countOperations,
 };

@@ -446,7 +446,49 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg('/rename_cat 999999 Yangi', 1);
   ok(last().includes("yo'q"), 'mavjud bo\'lmagan ID rad etildi');
 
-  // ═══ 16. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  // ═══ 16. BEKOR QILINGANNI TIKLASH ═══
+  console.log('\n─── /tikla ───');
+  const tiklaAcc = await accId('Naqd (sum)');
+  const tiklaOp = (await db.q(
+    `INSERT INTO onix_operations (type, account_id, category_id, amount, currency, paid_at, period, note, created_by)
+     VALUES ('expense',$1,$2,555000,'UZS','2026-03-05','2026-03-01','tiklash sinovi',1) RETURNING id`,
+    [tiklaAcc, ozOvqat])).rows[0].id;
+
+  const qoldiqAvval = Number((await db.one(
+    'SELECT balance FROM onix_balances WHERE account_id = $1', [tiklaAcc])).balance);
+
+  sent = []; await msg(`/del ${tiklaOp} xato bekor qildim`, 1);
+  ok(last().includes('Bekor qilindi'), 'yozuv bekor qilindi');
+  const qoldiqBekor = Number((await db.one(
+    'SELECT balance FROM onix_balances WHERE account_id = $1', [tiklaAcc])).balance);
+  eq(qoldiqBekor, qoldiqAvval + 555000, 'bekor qilinganda summa qoldiqqa qaytdi');
+
+  sent = []; await msg(`/tikla ${tiklaOp}`, 201);
+  ok(last().includes('Faqat o\'z yozuvingizni'), 'begona hodim tiklay olmadi');
+
+  sent = []; await msg(`/tikla ${tiklaOp}`, 1);
+  ok(last().includes('Tiklandi'), 'admin tikladi');
+  const qoldiqTiklangan = Number((await db.one(
+    'SELECT balance FROM onix_balances WHERE account_id = $1', [tiklaAcc])).balance);
+  eq(qoldiqTiklangan, qoldiqAvval, 'qoldiq avvalgi holiga qaytdi');
+
+  const tiklangan = await db.getOperation(tiklaOp);
+  ok(!tiklangan.deleted_at, 'yozuv endi bekor qilingan emas');
+  ok(tiklangan.restored_at, 'tiklash vaqti yozildi');
+  eq(String(tiklangan.restored_by), '1', 'kim tiklagani yozildi');
+  eq(tiklangan.delete_reason, 'xato bekor qildim', 'bekor qilish sababi tarixda qoldi');
+
+  sent = []; await msg(`/tikla ${tiklaOp}`, 1);
+  ok(last().includes('bekor qilinmagan'), 'ikkinchi marta tiklash rad etildi');
+
+  sent = []; await msg('/tikla 999999', 1);
+  ok(last().includes("yo'q"), 'mavjud bo\'lmagan ID rad etildi');
+
+  // Tiklangan yozuv daftarda yana ko'rinadi
+  eq((await db.countOperations({ from: '2026-03-05', to: '2026-03-05' })).n >= 1, 'true',
+     'tiklangan yozuv daftarga qaytdi');
+
+  // ═══ 17. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');
   const plastik = await accId('Plastik (sum)');
   const naqd    = await accId('Naqd (sum)');

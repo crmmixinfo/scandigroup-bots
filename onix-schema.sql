@@ -206,6 +206,12 @@ CREATE TRIGGER onix_operations_category_trg
   BEFORE INSERT OR UPDATE ON onix_operations
   FOR EACH ROW EXECUTE FUNCTION onix_check_operation_category();
 
+-- Bekor qilingan yozuvni tiklash izi. deleted_at tozalanadi (yozuv yana
+-- hisobga kiradi), lekin deleted_by va delete_reason joyida qoladi —
+-- «bir marta bekor qilingan edi» degani daftardan o'chib ketmasin.
+ALTER TABLE onix_operations ADD COLUMN IF NOT EXISTS restored_at TIMESTAMP;
+ALTER TABLE onix_operations ADD COLUMN IF NOT EXISTS restored_by BIGINT;
+
 -- Avvalgi versiyadan yangilanish: 'opening' turi va cheklovlar
 DO $upgrade$
 BEGIN
