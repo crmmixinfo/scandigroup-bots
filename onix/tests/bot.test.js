@@ -1,6 +1,8 @@
 process.env.PGSSL = 'off';
 process.env.SUPER_ADMIN_ID = process.env.SUPER_ADMIN_ID || '1';
 process.env.ONIX_BOT_TOKEN = '000:test';
+// Kunlik hisobot testi soatga bog'liq bo'lmasin: 00:00 da har doim "vaqti keldi"
+process.env.ONIX_DAILY_TIME = '00:00';
 const bot = require('../../onix-bot');
 const db  = require('../db');
 const K   = require('../keyboards');
@@ -620,7 +622,36 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   eq((await db.balances({ kind: 'kassa' })).filter(a => Number(a.balance) !== 0).length,
      pulli.length, 'qoldiqlar avvalgi holiga qaytdi');
 
-  // ═══ 19. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  // ═══ 19. KUNLIK HISOBOT ALOQA UZILGANDA YO'QOLMAYDI ═══
+  console.log('\n─── Kunlik hisobot: yetkazilmasa belgilanmaydi ───');
+
+  const kecha = require('../daily').yesterday();
+  await db.setSetting(bot.DAILY_KEY, 'hech-qachon');
+
+  // Bot yongan zahoti Telegram bilan aloqa yo'q — hamma xabar xato ketadi
+  const haqiqiy = Telegram.prototype.callApi;
+  Telegram.prototype.callApi = async function (method, payload = {}) {
+    if (method === 'sendMessage') throw new Error('ETIMEDOUT');
+    return haqiqiy.call(this, method, payload);
+  };
+
+  await bot.checkDailyReport();
+  eq(await db.getSetting(bot.DAILY_KEY), 'hech-qachon',
+     'aloqa yo\'q bo\'lganda kun "yuborilgan" deb belgilanmadi');
+
+  // Aloqa tiklandi — keyingi tekshiruv hisobotni yetkazadi
+  Telegram.prototype.callApi = haqiqiy;
+  sent = [];
+  await bot.checkDailyReport();
+  eq(await db.getSetting(bot.DAILY_KEY), kecha, 'yetkazilgach kun belgilandi');
+  ok(sent.some(x => (x.text || '').includes('KASSA')), 'kassa hisoboti yuborildi');
+
+  // Ikkinchi marta yuborilmaydi
+  sent = [];
+  await bot.checkDailyReport();
+  eq(sent.length, 0, 'bir kun ichida ikki marta yuborilmadi');
+
+  // ═══ 20. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');
   const plastik = await accId('Plastik (sum)');
   const naqd    = await accId('Naqd (sum)');

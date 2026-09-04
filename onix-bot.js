@@ -1312,8 +1312,22 @@ async function checkDailyReport() {
     if (!people.length) return;                   // hali hech kim ulanmagan — keyingi safar
 
     const res = await sendDailyReport(target, people);
+
+    // Kun "yuborilgan" deb faqat kimdir haqiqatan olgandagina belgilanadi.
+    // Bot yonganda Telegram bilan aloqa hali tiklanmagan bo'lishi mumkin —
+    // o'shanda hammasi xato ketadi. Avval kun baribir belgilanib qo'yilardi
+    // va hisobot butunlay yo'qolardi. Endi belgilanmaydi: 10 daqiqadan keyin
+    // tekshiruv qayta uriniadi.
+    if (!res.delivered) {
+      console.error(`⚠️  Kunlik hisobot (${target}) hech kimga yetmadi — keyingi tekshiruvda qayta uriniladi.`);
+      return;
+    }
+
     await db.setSetting(DAILY_KEY, target);
     console.log(`📅 Kunlik hisobot (${target}) yuborildi: ${res.delivered}/${res.total} kishi`);
+    if (res.delivered < res.total) {
+      console.error(`   ${res.total - res.delivered} kishiga yetmadi — /kunlik bilan qo'lda yuborsa bo'ladi.`);
+    }
   } catch (err) {
     console.error('Kunlik hisobot xatosi:', err.message);
   }
@@ -1610,3 +1624,6 @@ if (require.main === module) {
 }
 
 module.exports = bot;
+// Testlar uchun: kunlik hisobot tekshiruvini tashqaridan chaqirish mumkin
+module.exports.checkDailyReport = checkDailyReport;
+module.exports.DAILY_KEY = DAILY_KEY;

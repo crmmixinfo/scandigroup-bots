@@ -492,6 +492,16 @@ ketmaydi.
 
 ---
 
+### Yetkazilmasa — yo'qolmaydi
+
+Kun «yuborilgan» deb faqat kimdir hisobotni **haqiqatan olgandagina**
+belgilanadi. Bot yonganda Telegram bilan aloqa hali tiklanmagan bo'lishi
+mumkin — o'shanda hamma xabar xato ketadi. Bunday holatda kun
+belgilanmaydi va 10 daqiqadan keyingi tekshiruv qayta uriniadi.
+
+Bir qismi yetib borsa kun belgilanadi, qolganlariga yetmagani logda
+yoziladi — ularga `/kunlik` bilan qo'lda yuborsa bo'ladi.
+
 ## 10. Zaxira nusxa
 
 Baza bitta kompyuterda turadi. Disk buzilsa yoki noutbuk yo'qolsa —
@@ -837,7 +847,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (337 ta tekshiruv)
+onix/tests/          testlar (341 ta tekshiruv)
 ```
 
 ## 17. Testlar
