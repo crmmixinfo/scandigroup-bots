@@ -989,6 +989,7 @@ menu(K.MENU.settings, isAdmin, (ctx) => ctx.reply(
   `<b>Operatsiyalar</b>\n` +
   `<code>/del &lt;id&gt; &lt;sabab&gt;</code> — yozuvni bekor qilish\n` +
   `<code>/tikla &lt;id&gt;</code> — bekor qilinganni qaytarish\n` +
+  `<code>/yubor</code> — kunlik hisobotni hammaga tarqatish\n` +
   `<i>Yozuv o'chmaydi, bekor qilingan deb belgilanadi.</i>\n\n` +
   `<b>Kunlik hisobot</b>\n` +
   `Har kuni soat ${DAILY_TIME} da admin va rahbarlarga avtomat yuboriladi.\n` +
@@ -1452,6 +1453,32 @@ bot.command('zaxira', async (ctx) => {
     await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
       `❌ <b>Zaxira olinmadi</b>\n\n<code>${err.message}</code>`, HTML);
   }
+});
+
+// Kunlik hisobotni hammaga (admin va rahbarlarga) qo'lda tarqatish.
+// Ertalabki avtomat yuborish o'tkazib yuborilgan bo'lsa asqotadi.
+bot.command('yubor', async (ctx) => {
+  if (!isAdmin(ctx.user)) return ctx.reply('🔒 Faqat administrator uchun.');
+
+  const [arg] = args(ctx);
+  const date = arg ? f.parseDate(arg) : daily.yesterday();
+  if (!date) return ctx.reply('Foydalanish: <code>/yubor</code> yoki <code>/yubor 03.09.2026</code>', HTML);
+
+  const people = await daily.recipients();
+  if (!people.length) return ctx.reply('❌ Hisobot yuboriladigan odam yo\'q.');
+
+  const wait = await ctx.reply(`⏳ ${f.d(date)} hisoboti ${people.length} kishiga yuborilmoqda…`);
+  const res = await sendDailyReport(date, people);
+
+  // Kechagi kun tarqatilgan bo'lsa, ertalabki avtomat yuborish takrorlamasin
+  if (date === daily.yesterday() && res.delivered) await db.setSetting(DAILY_KEY, date);
+
+  const kimga = people.map(p => `· ${p.full_name}`).join('\n');
+  await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
+    `${res.delivered === res.total ? '✅' : '⚠️'} <b>${f.d(date)} hisoboti yuborildi</b>\n\n` +
+    `${res.delivered}/${res.total} kishiga yetdi · har biriga ${res.messages} ta xabar\n\n${kimga}` +
+    (res.delivered < res.total ? `\n\n<i>Yetmaganlar botni bloklagan yoki /start bosmagan bo'lishi mumkin.</i>` : ''),
+    HTML);
 });
 
 // ================= Google Sheets =================

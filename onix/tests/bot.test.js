@@ -651,7 +651,38 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   await bot.checkDailyReport();
   eq(sent.length, 0, 'bir kun ichida ikki marta yuborilmadi');
 
-  // ═══ 20. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
+  // ═══ 20. HISOBOTNI QO'LDA TARQATISH ═══
+  console.log('\n─── /yubor ───');
+  await db.setSetting(bot.DAILY_KEY, 'hech-qachon');
+
+  sent = []; await msg('/yubor', 301);
+  ok(last().includes('Faqat administrator'), 'rahbar tarqata olmadi');
+
+  sent = []; await msg('/yubor', 201);
+  ok(last().includes('Faqat administrator'), 'hodim tarqata olmadi');
+
+  sent = []; await msg('/yubor', 1);
+  const yuborMatn = sent.map(x => x.text || '').join('\n');
+  ok(yuborMatn.includes('KASSA'), 'kassa hisoboti tarqatildi');
+  ok(last().includes('yuborildi'), 'yakuniy xabar chiqdi');
+
+  const oluvchilar = await require('../daily').recipients();
+  for (const p of oluvchilar) {
+    ok(last().includes(p.full_name), `«${p.full_name}» ro'yxatda ko'rsatildi`);
+  }
+  eq(await db.getSetting(bot.DAILY_KEY), require('../daily').yesterday(),
+     'qo\'lda tarqatilgach ertalabki avtomat takrorlamaydi');
+
+  sent = []; await bot.checkDailyReport();
+  eq(sent.length, 0, 'avtomat yuborish takrorlamadi');
+
+  sent = []; await msg('/yubor 01.03.2026', 1);
+  ok(last().includes('01.03.2026'), 'boshqa sana bo\'yicha ham tarqatildi');
+
+  sent = []; await msg('/yubor bunday-sana-yoq', 1);
+  ok(last().includes('Foydalanish'), 'noto\'g\'ri sana rad etildi');
+
+  // ═══ 21. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');
   const plastik = await accId('Plastik (sum)');
   const naqd    = await accId('Naqd (sum)');

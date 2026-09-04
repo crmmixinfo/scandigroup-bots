@@ -492,6 +492,18 @@ ketmaydi.
 
 ---
 
+### Qo'lda tarqatish
+
+| Buyruq | Kimga boradi |
+|---|---|
+| `/kunlik` | Faqat so'ragan odamga (admin, rahbar) |
+| `/yubor` | **Hamma oluvchiga** — admin va rahbarlarga (faqat admin) |
+
+`/yubor 03.09.2026` — boshqa kun bo'yicha. Sana ko'rsatilmasa kechagi kun.
+
+Javobda kimga yetgani ro'yxat bilan ko'rsatiladi. Kechagi kun tarqatilgan
+bo'lsa ertalabki avtomat yuborish uni takrorlamaydi.
+
 ### Yetkazilmasa — yo'qolmaydi
 
 Kun «yuborilgan» deb faqat kimdir hisobotni **haqiqatan olgandagina**
@@ -847,7 +859,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (341 ta tekshiruv)
+onix/tests/          testlar (352 ta tekshiruv)
 ```
 
 ## 17. Testlar
