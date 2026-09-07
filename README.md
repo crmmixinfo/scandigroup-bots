@@ -12,6 +12,8 @@ Scandi Group uchun Telegram botlar.
 
 👉 **Birinchi marta ishlatyapsizmi?** [ISHGA-TUSHIRISH.md](ISHGA-TUSHIRISH.md) — qadamma-qadam, oddiy tilda.
 
+🆘 **Kompyuter almashdimi, buzildimi?** [TIKLASH.md](TIKLASH.md) — bo'sh kompyuterdan ONIX ni to'liq tiklash.
+
 ```bash
 npm install
 cp .env.example .env      # kerakli tokenlarni to'ldiring

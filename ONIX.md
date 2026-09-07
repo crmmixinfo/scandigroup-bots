@@ -603,6 +603,9 @@ yetadi.
 gunzip -c "onix-2026-09-03-0300.sql.gz" | psql "$DATABASE_URL"
 ```
 
+Bo'sh kompyuterdan boshlab to'liq tiklash — dastur o'rnatishdan
+botni qayta yoqishgacha: [TIKLASH.md](TIKLASH.md).
+
 Fayl ichida `DROP TABLE IF EXISTS` bor — eski jadvallar tozalanib,
 o'rniga nusxadagilari qo'yiladi. Bo'sh bazaga ham, ustiga ham tushadi.
 
