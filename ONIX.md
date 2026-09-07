@@ -728,6 +728,32 @@ ikki marta bosiladigan fayl bor:
 
 **Ish stoliga chiqarish:** faylni o'ng tugma bilan bosib
 «Создать псевдоним» (Make Alias) tanlang, yorliqni ish stoliga suring.
+
+### Terminalsiz, doimiy ishlash
+
+Yuqoridagi ikki fayl botni **Terminal oynasida** yoqadi — oyna yopilsa bot
+ham to'xtaydi. Buni butunlay hal qilish uchun uchinchi fayl bor:
+
+| Fayl | Nima qiladi |
+|---|---|
+| `ONIX-avtomat-yoqish.command` | Botni macOS xizmati (launchd) qilib qo'yadi |
+| `ONIX-avtomat-ochirish.command` | Bekor qiladi |
+| `ONIX-holati.command` | Ishlayaptimi va oxirgi log yozuvlari |
+
+Bir marta bosiladi. Shundan keyin:
+
+- Terminal oynasi umuman kerak emas
+- Kompyuter yonganda bot o'zi ishga tushadi
+- Xato bo'lib o'chsa launchd 30 soniyada qayta yoqadi
+- Yozuvlar `onix-bot.log` fayliga tushadi (git ga kirmaydi)
+
+Skript `~/Library/LaunchAgents/uz.onix.bot.plist` faylini yozadi: `node`
+ning to'liq yo'lini o'zi topadi (launchd cheklangan PATH bilan ishlaydi),
+loyiha papkasini `WorkingDirectory` qilib qo'yadi — `.env` shundan
+o'qiladi.
+
+> Kompyuter uxlab qolsa bot ham to'xtaydi va uyg'onganda davom etadi.
+> Doimiy, 24/7 ishlash uchun bot serverga ko'chirilishi kerak.
 Yorliq orqali ochilganda ham skript asl papkasini topadi.
 
 Faylning o'zini boshqa joyga **ko'chirmang** — u o'zini loyihaga nisbatan
