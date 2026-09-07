@@ -24,6 +24,24 @@ Admin plan va kunlik faktni kiritadi — bot savdo bo'limi xodimlariga avtomatik
 
 Jadvalni `.env` dagi `CRON_MORNING` / `CRON_EVENING` orqali o'zgartirish mumkin.
 
+### Hisobot ichidagi ko'rsatkichlar
+
+Har bir hisobotda (shaxsiy va bo'lim kesimida) quyidagilar chiqadi:
+
+| Ko'rsatkich | Formula | Nima uchun |
+|---|---|---|
+| Bajarilish % | `fakt / oylik plan` | Umumiy holat |
+| **Kunlik indeks** | `fakt / (oylik plan × o'tgan kun / oy kuni)` | O'tgan kunlarga proporsional planga nisbatan. **100% = grafik bo'yicha ketyapti**, 60% = jiddiy orqada |
+| **Oy oxiri prognozi** | `(fakt / o'tgan kun) × oy kuni` | Joriy temp saqlansa oy oxirida qancha bo'ladi + plandan farqi |
+| Kunlik kerak | `qolgan summa / qolgan kun` | Planni yopish uchun bugungi maqsad |
+
+Baholash: 🟢 ≥ 100% · 🟡 90–99% · 🔴 < 90%.
+
+**Muhim nuans:** ertalabki 09:00 hisobotda bugungi kun *tugagan kunlar* qatoriga qo'shilmaydi
+(fakt hali kiritilmagan) — indeks va prognoz faqat yopilgan kunlar bo'yicha hisoblanadi.
+19:00 reytingida esa bugungi kun ham hisobga olinadi. Shu tufayli indeks sun'iy ravishda
+pasayib ketmaydi.
+
 ### Rollar
 
 | Rol | Huquqlar |

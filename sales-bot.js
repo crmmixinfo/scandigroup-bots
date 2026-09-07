@@ -86,11 +86,18 @@ function bar(percent, size = 10) {
   return '▓'.repeat(filled) + '░'.repeat(size - filled);
 }
 
-// Grafikdan orqada/oldinda: 🟢 / 🟡 / 🔴
-function statusIcon(factPct, expectedPct) {
-  if (factPct >= expectedPct) return '🟢';
-  if (factPct >= expectedPct - 10) return '🟡';
+// Indeks/prognoz bahosi: 🟢 grafik bo'yicha · 🟡 chegarada · 🔴 orqada
+function gradeIcon(percent) {
+  if (percent === null || percent === undefined) return '⚪️';
+  if (percent >= 100) return '🟢';
+  if (percent >= 90) return '🟡';
   return '🔴';
+}
+
+// Ishorali summa: +12 000 000 / −3 400 000
+function signed(n) {
+  const v = Math.round(Number(n) || 0);
+  return (v >= 0 ? '+' : '−') + money(Math.abs(v));
 }
 
 function medal(i) {
@@ -156,7 +163,7 @@ async function activeUsers(roles) {
 }
 
 // Bitta xodimning oy kesimidagi ko'rsatkichlari
-async function metricsFor(tgId, date) {
+async function metricsFor(tgId, date, includeToday = true) {
   const period = periodOf(date);
   const { rows } = await db.query(`
     SELECT
@@ -165,11 +172,11 @@ async function metricsFor(tgId, date) {
                 WHERE tg_id = $1 AND fact_date >= $2::date AND fact_date <= $3::date), 0) AS fact,
       COALESCE((SELECT amount FROM sales_facts WHERE tg_id = $1 AND fact_date = $3::date), 0) AS day_fact
   `, [tgId, period, date]);
-  return buildMetrics(rows[0], date);
+  return buildMetrics(rows[0], date, includeToday);
 }
 
 // Butun bo'lim (barcha aktiv xodimlar) — bitta so'rovda
-async function metricsAll(date) {
+async function metricsAll(date, includeToday = true) {
   const period = periodOf(date);
   const { rows } = await db.query(`
     SELECT u.tg_id, u.full_name, u.role,
@@ -186,36 +193,84 @@ async function metricsAll(date) {
     WHERE u.active = true AND u.role IN ('seller', 'head')
     ORDER BY COALESCE(f.total, 0) DESC
   `, [period, date]);
-  return rows.map(r => ({ ...r, ...buildMetrics(r, date) }));
+  return rows.map(r => ({ ...r, ...buildMetrics(r, date, includeToday) }));
 }
 
-function buildMetrics(row, date) {
+function buildMetrics(row, date, includeToday = true) {
   const plan = Number(row.plan) || 0;
   const fact = Number(row.fact) || 0;
   const dayFact = Number(row.day_fact) || 0;
-  const total = daysInMonth(date);
-  const passed = dayNum(date);
-  const left = total - passed;
+  const daysTotal = daysInMonth(date);
+
+  // Indeks va prognoz bazasi — tugagan kunlar.
+  // Ertalabki hisobotda bugungi savdo hali kiritilmagan, shuning uchun bugun hisobga olinmaydi.
+  const elapsed = Math.max(0, Math.min(daysTotal, includeToday ? dayNum(date) : dayNum(date) - 1));
+  const daysLeft = daysTotal - elapsed;
+
   const factPct = pct(fact, plan);
-  const expectedPct = (passed / total) * 100;
+  const expectedPct = (elapsed / daysTotal) * 100;
   const remain = Math.max(0, plan - fact);
+
+  // O'tgan kunlarga proporsional plan va unga nisbatan indeks
+  const planToDate = plan * (elapsed / daysTotal);
+  const gapToDate = fact - planToDate;
+  const index = planToDate > 0 ? (fact / planToDate) * 100 : null;
+
+  // Oy oxiri prognozi: o'rtacha kunlik temp × oy kunlari
+  const avgPerDay = elapsed > 0 ? fact / elapsed : 0;
+  const forecast = elapsed > 0 ? avgPerDay * daysTotal : null;
+  const forecastPct = (forecast === null || plan <= 0) ? null : pct(forecast, plan);
+  const forecastGap = (forecast === null || plan <= 0) ? null : forecast - plan;
+
   return {
     plan, fact, dayFact, remain, factPct, expectedPct,
-    daysTotal: total, daysPassed: passed, daysLeft: left,
-    // oy oxirigacha kuniga qancha kerak (bugun ham hisobga olinadi)
-    needPerDay: remain > 0 ? Math.ceil(remain / Math.max(1, left + 1)) : 0,
-    icon: statusIcon(factPct, expectedPct),
+    daysTotal, daysPassed: elapsed, daysLeft,
+    planToDate, gapToDate, index,
+    avgPerDay, forecast, forecastPct, forecastGap,
+    // oy oxirigacha kuniga qancha kerak
+    needPerDay: remain > 0 && daysLeft > 0 ? Math.ceil(remain / daysLeft) : 0,
+    icon: gradeIcon(index),
   };
 }
 
 // ─────────────────────────── Hisobot matnlari ───────────────────────────
 
-function sellerReport(name, m, date, greeting = '🌅 Xayrli tong') {
-  const diff = m.factPct - m.expectedPct;
-  const trend = diff >= 0
-    ? `🟢 Grafikdan oldinda: +${diff.toFixed(1)}%`
-    : `🔴 Grafikdan orqada: ${diff.toFixed(1)}%`;
+// O'tgan kunlarga proporsional plan ↔ fakt ↔ indeks
+function indexBlock(m, pad = '   ') {
+  if (m.plan <= 0) {
+    return [`📐 <b>Kunlik indeks</b>`, `${pad}⚠️ Bu oyga plan qo'yilmagan.`];
+  }
+  if (m.index === null) {
+    return [`📐 <b>Kunlik indeks</b>`, `${pad}Oy endi boshlandi — baza yo'q.`];
+  }
+  return [
+    `📐 <b>Kunlik indeks</b> (${m.daysPassed} kunga)`,
+    `${pad}Reja: ${money(m.planToDate)}`,
+    `${pad}Fakt: ${money(m.fact)}`,
+    `${pad}Farq: <b>${signed(m.gapToDate)}</b>`,
+    `${pad}📊 <b>INDEKS: ${m.index.toFixed(1)}%</b> ${gradeIcon(m.index)}`,
+  ];
+}
 
+// Joriy temp bo'yicha oy oxiriga prognoz
+function forecastBlock(m, pad = '   ') {
+  if (m.forecast === null) {
+    return [`🔮 <b>Oy oxiri prognozi</b>`, `${pad}Ma'lumot yetarli emas.`];
+  }
+  const lines = [
+    `🔮 <b>Oy oxiri prognozi</b>`,
+    `${pad}O'rtacha/kun: ${money(m.avgPerDay)}`,
+  ];
+  if (m.forecastPct === null) {
+    lines.push(`${pad}Prognoz: <b>${money(m.forecast)}</b> so'm`);
+  } else {
+    lines.push(`${pad}Prognoz: <b>${money(m.forecast)}</b> (${m.forecastPct.toFixed(1)}%) ${gradeIcon(m.forecastPct)}`);
+    lines.push(`${pad}Plandan: <b>${signed(m.forecastGap)}</b>`);
+  }
+  return lines;
+}
+
+function sellerReport(name, m, date, greeting = '🌅 Xayrli tong') {
   const lines = [
     `${greeting}, ${esc(name)}!`,
     `📅 ${humanDate(date)}`,
@@ -223,31 +278,39 @@ function sellerReport(name, m, date, greeting = '🌅 Xayrli tong') {
     `🏷 <b>${esc(COMPANY)}</b> — Savdo bo'limi`,
     `━━━━━━━━━━━━━━━━━━`,
     `🎯 Oylik plan: <b>${money(m.plan)}</b> so'm`,
-    `✅ Bajarildi:  <b>${money(m.fact)}</b> so'm`,
+    `✅ Fakt:       <b>${money(m.fact)}</b> so'm`,
     `📉 Qoldi:      <b>${money(m.remain)}</b> so'm`,
-    ``,
     `${bar(m.factPct)} <b>${m.factPct.toFixed(1)}%</b>`,
     `━━━━━━━━━━━━━━━━━━`,
-    `📆 Oy: ${m.daysPassed}/${m.daysTotal} kun (kutilgan ${m.expectedPct.toFixed(1)}%)`,
-    trend,
+    `📆 O'tgan ${m.daysPassed}/${m.daysTotal} kun · qolgan ${m.daysLeft} kun`,
+    ``,
+    ...indexBlock(m),
+    ``,
+    ...forecastBlock(m),
+    `━━━━━━━━━━━━━━━━━━`,
   ];
-  if (m.remain > 0) lines.push(`⚡️ Kunlik kerak: <b>${money(m.needPerDay)}</b> so'm`);
-  else lines.push(`🏆 Plan bajarildi! Ustama: <b>${money(m.fact - m.plan)}</b> so'm`);
+  if (m.plan <= 0) lines.push(`⚠️ Bu oyga sizga plan qo'yilmagan — administratorga murojaat qiling.`);
+  else if (m.remain <= 0) lines.push(`🏆 Plan bajarildi! Ustama: <b>${money(m.fact - m.plan)}</b> so'm`);
+  else if (m.daysLeft > 0) lines.push(`⚡️ Kunlik kerak: <b>${money(m.needPerDay)}</b> so'm × ${m.daysLeft} kun`);
+  else lines.push(`⏳ Oy tugadi. Bajarilmadi: <b>${money(m.remain)}</b> so'm`);
   return lines.join('\n');
 }
 
-function teamReport(rows, date, title) {
+function teamReport(rows, date, title, includeToday = true) {
   const totals = rows.reduce((a, r) => ({
     plan: a.plan + r.plan, fact: a.fact + r.fact, day: a.day + r.dayFact,
   }), { plan: 0, fact: 0, day: 0 });
-  const t = buildMetrics({ plan: totals.plan, fact: totals.fact, day_fact: totals.day }, date);
+  const t = buildMetrics({ plan: totals.plan, fact: totals.fact, day_fact: totals.day }, date, includeToday);
 
   const body = rows.length === 0
-    ? ['—  Aktiv xodim yo\'q.']
+    ? ["—  Aktiv xodim yo'q."]
     : rows.map((r, i) => [
         `${medal(i)} <b>${esc(r.full_name)}</b> ${r.icon}`,
-        `    ${money(r.fact)} / ${money(r.plan)} — <b>${pct(r.fact, r.plan).toFixed(1)}%</b>`,
-        `    ${bar(pct(r.fact, r.plan), 8)}  bugun: +${money(r.dayFact)}`,
+        `    ${money(r.fact)} / ${money(r.plan)} — <b>${r.factPct.toFixed(1)}%</b>`,
+        `    ${bar(r.factPct, 8)}  bugun: +${money(r.dayFact)}`,
+        `    📊 indeks: <b>${r.index === null ? '—' : r.index.toFixed(0) + '%'}</b>` +
+        `  ·  🔮 prognoz: <b>${r.forecast === null ? '—' : money(r.forecast)}</b>` +
+        `${r.forecastPct === null ? '' : ` (${r.forecastPct.toFixed(0)}%) ${gradeIcon(r.forecastPct)}`}`,
       ].join('\n'));
 
   return [
@@ -260,10 +323,14 @@ function teamReport(rows, date, title) {
     `📊 <b>BO'LIM JAMI</b>`,
     `🎯 Plan: ${money(t.plan)} so'm`,
     `✅ Fakt: ${money(t.fact)} so'm`,
-    `${bar(t.factPct)} <b>${t.factPct.toFixed(1)}%</b> ${t.icon}`,
+    `${bar(t.factPct)} <b>${t.factPct.toFixed(1)}%</b>`,
     `📉 Qoldi: ${money(t.remain)} so'm`,
     `📈 Bugungi savdo: +${money(totals.day)} so'm`,
-    `📆 Oy: ${t.daysPassed}/${t.daysTotal} kun (kutilgan ${t.expectedPct.toFixed(1)}%)`,
+    `📆 O'tgan ${t.daysPassed}/${t.daysTotal} kun · qolgan ${t.daysLeft} kun`,
+    ``,
+    ...indexBlock(t),
+    ``,
+    ...forecastBlock(t),
   ].join('\n');
 }
 
@@ -289,7 +356,7 @@ async function leaderIds() {
 
 async function broadcastMorning() {
   const date = today();
-  const rows = await metricsAll(date);
+  const rows = await metricsAll(date, false);
   let ok = 0;
   // 1) Har bir xodimga o'zining shaxsiy kartochkasi
   for (const r of rows) {
@@ -297,7 +364,7 @@ async function broadcastMorning() {
     if (await send(r.tg_id, sellerReport(r.full_name, r, date))) ok++;
   }
   // 2) Rahbar va adminlarga bo'lim jadvali
-  const team = teamReport(rows, date, '🌅 <b>Ertalabki hisobot</b>');
+  const team = teamReport(rows, date, '🌅 <b>Ertalabki hisobot</b>', false);
   for (const id of await leaderIds()) {
     if (await send(id, team)) ok++;
   }
