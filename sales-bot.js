@@ -280,20 +280,26 @@ async function send(tgId, text, extra = {}) {
 }
 
 // 09:00 — barcha xodimlarga shaxsiy kartochka, rahbar/adminlarga bo'lim jadvali
+// Bo'lim jadvalini oladiganlar: adminlar + rahbarlar (+ super admin)
+async function leaderIds() {
+  const ids = new Set((await activeUsers(['admin', 'head'])).map(u => Number(u.tg_id)));
+  if (SUPER_ADMIN_ID) ids.add(SUPER_ADMIN_ID);
+  return ids;
+}
+
 async function broadcastMorning() {
   const date = today();
   const rows = await metricsAll(date);
   let ok = 0;
+  // 1) Har bir xodimga o'zining shaxsiy kartochkasi
   for (const r of rows) {
     if (r.plan <= 0) continue;
     if (await send(r.tg_id, sellerReport(r.full_name, r, date))) ok++;
   }
+  // 2) Rahbar va adminlarga bo'lim jadvali
   const team = teamReport(rows, date, '🌅 <b>Ertalabki hisobot</b>');
-  for (const u of await activeUsers(['admin', 'head'])) {
-    if (await send(u.tg_id, team)) ok++;
-  }
-  if (SUPER_ADMIN_ID && !(await activeUsers(['admin', 'head'])).some(u => u.tg_id == SUPER_ADMIN_ID)) {
-    await send(SUPER_ADMIN_ID, team);
+  for (const id of await leaderIds()) {
+    if (await send(id, team)) ok++;
   }
   console.log(`[${date}] 09:00 hisobot yuborildi — ${ok} ta xabar`);
 }
@@ -303,9 +309,7 @@ async function broadcastEvening() {
   const date = today();
   const rows = await metricsAll(date);
   const text = teamReport(rows, date, '🌆 <b>Kunlik reyting</b>');
-  const targets = await activeUsers(['admin', 'head']);
-  const ids = new Set(targets.map(u => Number(u.tg_id)));
-  if (SUPER_ADMIN_ID) ids.add(SUPER_ADMIN_ID);
+  const ids = await leaderIds();
   for (const id of ids) await send(id, text);
   console.log(`[${date}] 19:00 reyting yuborildi — ${ids.size} ta rahbar`);
 }
