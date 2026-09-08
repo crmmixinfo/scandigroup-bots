@@ -501,8 +501,28 @@ ketmaydi.
 
 `/yubor 03.09.2026` — boshqa kun bo'yicha. Sana ko'rsatilmasa kechagi kun.
 
-Javobda kimga yetgani ro'yxat bilan ko'rsatiladi. Kechagi kun tarqatilgan
-bo'lsa ertalabki avtomat yuborish uni takrorlamaydi.
+Javobda **har bir odam alohida** ko'rsatiladi:
+
+```
+✅ Saidaziz Saidiy
+✅ Anvar Sodiqov
+❌ Humoyun Rayimov — botni bloklagan
+```
+
+Telegram xatosi odam tushunadigan sababga aylantiriladi: «botni
+bloklagan», «botga /start bosmagan», «Telegram hisobi o'chirilgan».
+
+Ro'yxatda bor, lekin hali `/start` bosmagan admin va rahbarlar alohida
+eslatiladi — ular hisobotni **umuman** olmaydi va yuqoridagi ro'yxatga
+ham tushmaydi:
+
+```
+⏳ Hali ulanmagan — hisobot umuman bormaydi:
+· Humoyun Rayimov (@rkh703)
+```
+
+Kechagi kun tarqatilgan bo'lsa ertalabki avtomat yuborish uni
+takrorlamaydi.
 
 ### Yetkazilmasa — yo'qolmaydi
 
@@ -888,7 +908,7 @@ onix/tools/apps-script.gs  Sheets ichiga qo'yiladigan skript
 onix/tools/          yuklovchilar, zaxira, Sheets, ishga tushirish fayllari
 onix/kategoriyalar.txt   kategoriya daraxtining manbasi — shuni tahrirlang
 onix/jamoa.txt       jamoa ro'yxati — shuni tahrirlang
-onix/tests/          testlar (352 ta tekshiruv)
+onix/tests/          testlar (357 ta tekshiruv)
 ```
 
 ## 17. Testlar

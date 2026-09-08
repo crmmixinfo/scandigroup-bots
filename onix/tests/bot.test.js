@@ -664,7 +664,7 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
   sent = []; await msg('/yubor', 1);
   const yuborMatn = sent.map(x => x.text || '').join('\n');
   ok(yuborMatn.includes('KASSA'), 'kassa hisoboti tarqatildi');
-  ok(last().includes('yuborildi'), 'yakuniy xabar chiqdi');
+  ok(last().includes('hisoboti') && last().includes('kishiga yetdi'), 'yakuniy xabar chiqdi');
 
   const oluvchilar = await require('../daily').recipients();
   for (const p of oluvchilar) {
@@ -681,6 +681,32 @@ const accId = async (n) => (await db.one('SELECT id FROM onix_accounts WHERE nam
 
   sent = []; await msg('/yubor bunday-sana-yoq', 1);
   ok(last().includes('Foydalanish'), 'noto\'g\'ri sana rad etildi');
+
+  // Kimga yetgani, kimga yetmagani va nega — javobda ko'rinsin
+  console.log('\n─── /yubor: kim olmagani ko\'rsatiladi ───');
+  const oluvchi = (await require('../daily').recipients())[1];   // rahbarlardan biri
+  const asl = Telegram.prototype.callApi;
+  Telegram.prototype.callApi = async function (method, payload = {}) {
+    if (method === 'sendMessage' && String(payload.chat_id) === String(oluvchi.tg_id)) {
+      throw new Error('403: Forbidden: bot was blocked by the user');
+    }
+    return asl.call(this, method, payload);
+  };
+
+  sent = []; await msg('/yubor', 1);
+  const holat = last();
+  Telegram.prototype.callApi = asl;
+
+  ok(holat.includes(`❌ ${oluvchi.full_name}`), 'olmagan odam ❌ bilan ko\'rsatildi');
+  ok(holat.includes('bloklagan'), 'sababi odam tilida yozildi');
+  ok(holat.includes('✅ Bosh admin'), 'olgan odam ✅ bilan ko\'rsatildi');
+
+  // Ro'yxatda bor, lekin /start bosmagan rahbar — hisobot umuman bormaydi
+  await db.addPendingUser('@humoyun_test', 'Humoyun Test', 'manager', 1);
+  sent = []; await msg('/yubor', 1);
+  ok(last().includes('Hali ulanmagan'), 'ulanmagan rahbar haqida ogohlantirildi');
+  ok(last().includes('Humoyun Test'), 'nomi ko\'rsatildi');
+  await db.removePendingUser('@humoyun_test');
 
   // ═══ 21. DAFTARNI HISOB BO'YICHA FILTRLASH ═══
   console.log('\n─── Daftar: hisob filtri ───');

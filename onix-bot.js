@@ -1284,20 +1284,37 @@ function dailyDue(now = new Date()) {
   return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m);
 }
 
+// Telegram xatosini odam tushunadigan sababga aylantiradi.
+// «Nega Humoyun akaga hisobot bormayapti?» degan savolga javob shu yerdan
+// chiqadi — logga tushib qolgan texnik matndan emas.
+function sendFailReason(message) {
+  if (/blocked by the user/i.test(message))            return 'botni bloklagan';
+  if (/chat not found|user not found/i.test(message))  return 'botga /start bosmagan';
+  if (/deactivated/i.test(message))                    return 'Telegram hisobi o\'chirilgan';
+  if (/can.t initiate conversation/i.test(message))    return 'botga /start bosmagan';
+  return message;
+}
+
 async function sendDailyReport(date, to) {
   const messages = await daily.build(date);
   const people = to || await daily.recipients();
   let delivered = 0;
+  const failed = [];
 
   for (const person of people) {
-    let ok = true;
+    let problem = null;
     for (const text of messages) {
       try { await bot.telegram.sendMessage(person.tg_id, text, HTML); }
-      catch (err) { ok = false; console.error(`Kunlik hisobot yuborilmadi (${person.full_name}): ${err.message}`); break; }
+      catch (err) { problem = sendFailReason(err.message); break; }
     }
-    if (ok) delivered++;
+    if (problem) {
+      failed.push({ name: person.full_name, reason: problem });
+      console.error(`Kunlik hisobot yuborilmadi (${person.full_name}): ${problem}`);
+    } else {
+      delivered++;
+    }
   }
-  return { delivered, total: people.length, messages: messages.length };
+  return { delivered, total: people.length, messages: messages.length, failed };
 }
 
 async function checkDailyReport() {
@@ -1473,11 +1490,25 @@ bot.command('yubor', async (ctx) => {
   // Kechagi kun tarqatilgan bo'lsa, ertalabki avtomat yuborish takrorlamasin
   if (date === daily.yesterday() && res.delivered) await db.setSetting(DAILY_KEY, date);
 
-  const kimga = people.map(p => `· ${p.full_name}`).join('\n');
+  const xato = new Map(res.failed.map(x => [x.name, x.reason]));
+  const kimga = people.map(p => xato.has(p.full_name)
+    ? `❌ ${p.full_name} — <i>${f.esc(xato.get(p.full_name))}</i>`
+    : `✅ ${p.full_name}`).join('\n');
+
+  // Ro'yxatda bor, lekin hali /start bosmagan odamlar umuman hisobot
+  // olmaydi — ular bu ro'yxatga ham tushmaydi. Shuni aytib qo'yamiz.
+  const kutayotgan = (await db.listPendingUsers())
+    .filter(r => r.role === 'admin' || r.role === 'manager');
+
   await ctx.telegram.editMessageText(ctx.chat.id, wait.message_id, undefined,
-    `${res.delivered === res.total ? '✅' : '⚠️'} <b>${f.d(date)} hisoboti yuborildi</b>\n\n` +
+    `${res.delivered === res.total && !kutayotgan.length ? '✅' : '⚠️'} ` +
+    `<b>${f.d(date)} hisoboti</b>\n\n` +
     `${res.delivered}/${res.total} kishiga yetdi · har biriga ${res.messages} ta xabar\n\n${kimga}` +
-    (res.delivered < res.total ? `\n\n<i>Yetmaganlar botni bloklagan yoki /start bosmagan bo'lishi mumkin.</i>` : ''),
+    (kutayotgan.length
+      ? `\n\n⏳ <b>Hali ulanmagan</b> — hisobot umuman bormaydi:\n` +
+        kutayotgan.map(r => `· ${f.esc(r.full_name)} (<code>@${f.esc(r.username)}</code>)`).join('\n') +
+        `\n\n<i>Botga kirib /start bosishsa avtomat ulanadi.</i>`
+      : ''),
     HTML);
 });
 
