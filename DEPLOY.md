@@ -14,8 +14,9 @@ Sizga aynan shu kerak.
 
 1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
 2. `crmmixinfo/scandigroup-bots` ni tanlang.
-3. **Settings → Source** da branch'ni `claude/mebel-production-monitoring-nje80r`
-   ga o'zgartiring. Standart holatda `main` turadi, unda ERP yo'q.
+3. **Settings → Source** da branch `main` ekanini tekshiring. ERP shu
+   branchda turadi; boshqa branch tanlangan bo'lsa sayt eski kodda qoladi
+   va push qilingan o'zgarishlar ko'rinmaydi.
 4. Loyihada **+ New** → **Database** → **Add PostgreSQL**.
 5. Dastur xizmatining **Variables** bo'limiga ikkita qator qo'shing:
    ```
@@ -28,6 +29,17 @@ Sizga aynan shu kerak.
 6. **Settings** → **Networking** → **Generate Domain**.
 
 Tayyor. Manzilni oching, PIN `0000`.
+
+**Qaysi versiya ishlayotganini bilish.** `/health` sahifasini oching:
+
+```
+{"ok":true,"version":"75fc528","started":"...","columns":["rang","mato",...]}
+```
+
+`version` — saytda ishlayotgan commit. GitHub'dagi oxirgi commit bilan bir xil
+bo'lmasa, deploy o'tmagan: branch sozlamasini yoki deploy logini tekshiring.
+`columns` ro'yxati jurnaldagi yangi ustunlar bor-yo'qligini ko'rsatadi —
+brauzer eski nusxani ko'rsatayotganini shundan ajratasiz.
 
 **Deploy logida nima ko'rinishi kerak:**
 ```
@@ -42,6 +54,7 @@ Bu ikki qator chiqsa — hammasi joyida.
 |---|---|---|
 | `DATABASE_URL kiritilmagan` | baza ulanmagan | 5-qadamdagi birinchi qatorni qo'shing |
 | `Cannot find module 'telegraf'` yoki bot xatosi | eski branch | 3-qadam: branch'ni tekshiring |
+| Sayt ochiladi, lekin o'zgarish ko'rinmaydi | eski branch yoki deploy o'tmagan | `/health` dagi `version` ni GitHub'dagi oxirgi commit bilan solishtiring |
 | `ECONNREFUSED` / `timeout` | baza hali ko'tarilmagan | 1-2 daqiqa kuting, **Redeploy** bosing |
 | `self signed certificate` | SSL sozlamasi | `PGSSL` o'zgaruvchisi qo'shilgan bo'lsa, o'chiring |
 
@@ -66,7 +79,7 @@ Faqat shu kompyuterdan ochiladi.
 [Docker Desktop](https://docker.com/products/docker-desktop) o'rnatilgan bo'lsa:
 
 ```bash
-git clone -b claude/mebel-production-monitoring-nje80r \
+git clone -b main \
   https://github.com/crmmixinfo/scandigroup-bots.git
 cd scandigroup-bots
 docker compose up
@@ -85,7 +98,7 @@ To'xtatish: `Ctrl+C`. Ma'lumot `pgdata/` papkasida qoladi, qayta
 **Kerak:** Node.js 18+ va PostgreSQL 14+.
 
 ```bash
-git clone -b claude/mebel-production-monitoring-nje80r \
+git clone -b main \
   https://github.com/crmmixinfo/scandigroup-bots.git
 cd scandigroup-bots
 cp .env.example .env

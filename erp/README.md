@@ -303,7 +303,7 @@ bosqichma-bosqich kiritilishi mumkin — hammasi birdan emas.
 Bir necha xodim bir vaqtda ishlashi kerak bo'lsa dastur internetda turishi
 kerak. Railway yoki Render'da tartib bir xil:
 
-1. Loyihani GitHub'dan ulang, `claude/mebel-production-monitoring-nje80r`
+1. Loyihani GitHub'dan ulang, `main`
    tarmog'ini tanlang.
 2. **PostgreSQL** qo'shing — platforma `DATABASE_URL` ni o'zi qo'yadi.
 3. O'zgaruvchilarga `ERP_AUTO_MIGRATE=1` qo'shing. Boshqa hech narsa

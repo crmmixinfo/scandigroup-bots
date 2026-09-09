@@ -6,7 +6,15 @@ const auth = require('./auth');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Sahifa va skriptlar keshlanmasin: yangi versiya chiqqanda xodim brauzerni
+// tozalab o'tirmasligi kerak. Rasm va shrift keshlanaveradi.
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: true,
+  setHeaders(res, filePath) {
+    if (/\.(html|js|css)$/.test(filePath))
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  },
+}));
 
 // Har so'rovda sessiya o'qiladi; huquq tekshiruvi modul yo'llarida.
 app.use(auth.authenticate);
@@ -40,12 +48,28 @@ app.get('/api/modules', (req, res) => {
   ].filter((m) => m.open));
 });
 
+// Qaysi versiya ishlayotganini brauzerdan ko'rish uchun: /health ni ochib
+// commit raqamiga qarash kifoya. "Deploy o'tdimi yoki brauzer eskisini
+// ko'rsatyaptimi" degan savol shu bilan yopiladi.
+// Railway commit SHA sini o'zi qo'yadi; lokalda bo'lmasa 'local' turadi.
+const VERSION = process.env.RAILWAY_GIT_COMMIT_SHA
+             || process.env.RENDER_GIT_COMMIT
+             || process.env.GIT_COMMIT || 'local';
+const STARTED = new Date().toISOString();
+
 app.get('/health', async (_req, res) => {
+  const info = {
+    version: VERSION.slice(0, 7),
+    started: STARTED,
+    // Jurnal ustunlari shu ro'yxatdan chiqadi — brauzerda eski jadval
+    // ko'rinsa, bu yerdan yangi ustunlar bor-yo'qligi bilinadi.
+    columns: ['rang', 'mato', 'lak', 'qadoqlash', 'tm_ombor'],
+  };
   try {
     await db.query('SELECT 1');
-    res.json({ ok: true });
+    res.json({ ok: true, ...info });
   } catch (e) {
-    res.status(503).json({ ok: false, error: e.message });
+    res.status(503).json({ ok: false, ...info, error: e.message });
   }
 });
 
