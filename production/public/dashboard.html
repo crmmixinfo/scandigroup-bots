@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ishlab chiqarish paneli · Scandi</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Ishlab chiqarish paneli</h1></div>
+  <div class="row">
+    <input id="date" type="date" style="width:auto">
+    <button onclick="load()">Yangilash</button>
+  </div>
+</div>
+
+<!-- Direktor ko'radigan birinchi qator -->
+<div class="grid g3" id="kpis"></div>
+
+<div class="grid g2" style="margin-top:16px">
+  <div class="card">
+    <h2>Komplektlilik · sotishga tayyor to'plamlar</h2>
+    <table><thead><tr><th>To'plam</th><th class="num">To'liq to'plam</th>
+      <th>Bloklovchi pozitsiya</th></tr></thead>
+      <tbody id="tSets"></tbody></table>
+    <p class="muted" style="margin-top:12px;font-size:13px">
+      Ishlab chiqarilgan dona soni emas — omborda yig'ish mumkin bo'lgan to'liq to'plam soni.</p>
+  </div>
+
+  <div class="card">
+    <h2>Bottleneck · eng uzun navbat</h2>
+    <table><thead><tr><th>Uchastka</th><th>Bo'lim</th>
+      <th class="num">Navbat (dona)</th></tr></thead>
+      <tbody id="tBneck"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Reja / fakt</h2>
+    <table><thead><tr><th>Mahsulot</th><th class="num">Reja</th>
+      <th class="num">Fakt</th><th class="num">%</th></tr></thead>
+      <tbody id="tPlan"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Bo'limlar orasidagi qoldiq (WIP)</h2>
+    <div id="wipBars"></div>
+  </div>
+
+  <div class="card">
+    <h2>Brak · Pareto</h2>
+    <table><thead><tr><th>Sabab</th><th>Manba</th><th class="num">Dona</th></tr></thead>
+      <tbody id="tDefect"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>To'xtash · Pareto</h2>
+    <table><thead><tr><th>Sabab</th><th>Uchastka</th><th class="num">Daqiqa</th></tr></thead>
+      <tbody id="tDown"></tbody></table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Uchastkalar kesimi</h2>
+  <table><thead><tr><th>Liniya</th><th>Bo'lim</th><th>Uchastka</th>
+    <th class="num">OK</th><th class="num">Brak</th><th class="num">Brak %</th></tr></thead>
+    <tbody id="tStations"></tbody></table>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const n = v => (v ?? 0).toLocaleString('uz-UZ');
+$('date').value = new Date().toISOString().slice(0, 10);
+
+function pctTag(p){
+  const c = p >= 95 ? 'ok' : p >= 80 ? 'warn' : 'bad';
+  return `<span class="tag ${c}">${p ?? 0}%</span>`;
+}
+
+async function load(){
+  const d = await fetch('/api/dashboard?date=' + $('date').value).then(r => r.json());
+
+  const planTotal = d.planFact.reduce((s, r) => s + Number(r.plan_qty), 0);
+  const factTotal = d.planFact.reduce((s, r) => s + Number(r.fact_qty), 0);
+  const defectTotal = d.stationDaily.reduce((s, r) => s + Number(r.qty_defect), 0);
+  const okTotal = d.stationDaily.reduce((s, r) => s + Number(r.qty_ok), 0);
+  const defectPct = okTotal + defectTotal
+    ? (100 * defectTotal / (okTotal + defectTotal)).toFixed(1) : '0.0';
+  const dtMin = d.downtime.reduce((s, r) => s + Number(r.minutes), 0);
+  const sets = d.completeness.reduce((s, r) => s + Number(r.complete_sets || 0), 0);
+
+  $('kpis').innerHTML = [
+    ['Reja bajarilishi', planTotal ? Math.round(100 * factTotal / planTotal) + '%' : '—',
+      `${n(factTotal)} / ${n(planTotal)} dona`],
+    ['Brak', defectPct + '%', `${n(defectTotal)} dona`],
+    ['To\'xtash', n(dtMin), 'daqiqa'],
+    ['Tayyor to\'plam', n(sets), 'sotishga tayyor'],
+  ].map(([t, v, s]) => `<div class="card"><h2>${t}</h2>
+      <div class="kpi">${v}</div><div class="muted" style="font-size:13px">${s}</div></div>`).join('');
+
+  // Komplektlilik + eng kam imkon beruvchi pozitsiya
+  $('tSets').innerHTML = d.completeness.length ? d.completeness.map(s => {
+    const b = d.blockers.filter(x => x.set_product_id === s.set_product_id)[0];
+    return `<tr><td>${s.set_name}</td><td class="num">${n(s.complete_sets)}</td>
+      <td class="muted">${b ? b.blocking_item + ' · ' + n(b.in_stock) + ' dona' : '—'}</td></tr>`;
+  }).join('') : '<tr><td class="muted" colspan="3">To\'plam kiritilmagan</td></tr>';
+
+  $('tBneck').innerHTML = d.bottleneck.length ? d.bottleneck.map((b, i) =>
+    `<tr><td>${i === 0 ? '<span class="tag bad">1</span> ' : ''}${b.station}</td>
+      <td class="muted">${b.department}</td><td class="num">${n(b.queue_qty)}</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="3">Navbat yo\'q</td></tr>';
+
+  $('tPlan').innerHTML = d.planFact.length ? d.planFact.map(r =>
+    `<tr><td>${r.product}</td><td class="num">${n(r.plan_qty)}</td>
+      <td class="num">${n(r.fact_qty)}</td><td class="num">${pctTag(Number(r.pct))}</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="4">Reja kiritilmagan</td></tr>';
+
+  const maxWip = Math.max(1, ...d.departmentWip.map(w => Number(w.queue_qty) || 0));
+  $('wipBars').innerHTML = d.departmentWip.length ? d.departmentWip.map(w => `
+    <div style="margin-bottom:14px">
+      <div class="row" style="justify-content:space-between">
+        <span>${w.line} · ${w.department}</span>
+        <span class="num">${n(w.queue_qty)}</span></div>
+      <div class="bar"><i style="width:${100 * (Number(w.queue_qty) || 0) / maxWip}%"></i></div>
+    </div>`).join('') : '<p class="muted">Ma\'lumot yo\'q</p>';
+
+  $('tDefect').innerHTML = d.defects.length ? d.defects.map(r =>
+    `<tr><td>${r.reason}</td><td class="muted">${r.origin_station}</td>
+      <td class="num">${n(r.qty)}</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="3">Brak qayd etilmagan</td></tr>';
+
+  $('tDown').innerHTML = d.downtime.length ? d.downtime.map(r =>
+    `<tr><td>${r.reason}</td><td class="muted">${r.station}</td>
+      <td class="num">${n(r.minutes)}</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="3">To\'xtash qayd etilmagan</td></tr>';
+
+  $('tStations').innerHTML = d.stationDaily.length ? d.stationDaily.map(r =>
+    `<tr><td class="muted">${r.line}</td><td class="muted">${r.department}</td><td>${r.station}</td>
+      <td class="num">${n(r.qty_ok)}</td><td class="num">${n(r.qty_defect)}</td>
+      <td class="num">${r.defect_pct ?? 0}%</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="6">Bu sanada ma\'lumot yo\'q</td></tr>';
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

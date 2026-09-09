@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node candidate-bot.js",
-    "hr": "node hr-bot.js"
+    "hr": "node hr-bot.js",
+    "production": "node production/api.js"
   },
   "dependencies": {
-    "telegraf": "^4.16.0",
+    "dotenv": "^16.3.0",
+    "express": "^4.19.2",
     "pg": "^8.11.0",
-    "dotenv": "^16.3.0"
+    "telegraf": "^4.16.0"
   },
   "engines": {
     "node": ">=18"

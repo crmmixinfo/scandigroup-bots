@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Uchastka terminali · Scandi</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1 id="ttl">Uchastka terminali</h1></div>
+  <div class="row"><span class="muted" id="who"></span>
+    <button id="logout" class="hide">Chiqish</button></div>
+</div>
+
+<!-- 1 · PIN -->
+<section id="scLogin" class="card" style="max-width:360px;margin:0 auto">
+  <h2>Kirish</h2>
+  <label>PIN kod</label>
+  <input id="pin" type="tel" inputmode="numeric" maxlength="4" placeholder="••••"
+         style="font-size:28px;text-align:center;letter-spacing:.4em">
+  <button class="primary" style="width:100%;margin-top:14px" onclick="login()">Kirish</button>
+  <p class="muted" style="margin-top:12px;font-size:13px">Demo: 1111 · 2222 · 3333 · 4444</p>
+</section>
+
+<!-- 2 · Uchastka tanlash -->
+<section id="scPick" class="card hide" style="max-width:480px;margin:0 auto">
+  <h2>Uchastkani tanlang</h2>
+  <div class="stack">
+    <div><label>Liniya</label><select id="selLine" onchange="fillStations()"></select></div>
+    <div><label>Uchastka</label><select id="selStation"></select></div>
+    <button class="primary" onclick="openStation()">Boshlash</button>
+  </div>
+</section>
+
+<!-- 3 · Ish ekrani -->
+<section id="scWork" class="hide">
+  <div class="grid g2">
+    <div class="card">
+      <h2>Mahsulot</h2>
+      <select id="selProduct" onchange="renderQueue()"></select>
+      <p class="muted" style="margin-top:10px;font-size:13px" id="queueInfo"></p>
+
+      <div class="counter" id="cnt">0</div>
+      <div class="pad">
+        <button onclick="bump(1)">+1</button>
+        <button onclick="bump(5)">+5</button>
+        <button onclick="bump(10)">+10</button>
+        <button onclick="bump(-1)">−1</button>
+        <button onclick="setCnt(0)">C</button>
+        <button class="primary" onclick="submitOk()">Yozish</button>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <h2>Brak</h2>
+        <div class="stack">
+          <div><label>Sabab</label><select id="selDefect"></select></div>
+          <div><label>Kelib chiqqan uchastka (ixtiyoriy)</label>
+            <select id="selOrigin"><option value="">— aniqlanmagan —</option></select></div>
+          <div class="row">
+            <input id="defQty" type="number" min="1" value="1" style="width:110px">
+            <button class="danger" style="flex:1" onclick="submitDefect()">Brak yozish</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>To'xtash</h2>
+        <div id="dtIdle" class="stack">
+          <select id="selDowntime"></select>
+          <button onclick="startDowntime()">To'xtashni boshlash</button>
+        </div>
+        <div id="dtActive" class="hide stack">
+          <p><span class="tag bad">TO'XTAB TURIBDI</span>
+             <span class="muted" id="dtSince"></span></p>
+          <button class="primary" onclick="stopDowntime()">Ishni davom ettirish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Shu smenadagi yozuvlar</h2>
+    <table><tbody id="logBody"></tbody></table>
+  </div>
+</section>
+
+<script>
+const api = (u, o) => fetch(u, {headers:{'Content-Type':'application/json'}, ...o})
+  .then(async r => { const j = await r.json(); if(!r.ok) throw new Error(j.error||'Xato'); return j; });
+const $ = id => document.getElementById(id);
+const show = (...ids) => ['scLogin','scPick','scWork'].forEach(s =>
+  $(s).classList.toggle('hide', !ids.includes(s)));
+
+let ref = null, me = null, station = null, ctx = null, shift = null, cnt = 0, log = [], dt = null;
+
+function toast(msg, bad){
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  if (bad) t.style.borderColor = 'var(--bad)';
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+async function boot(){
+  ref = await api('/api/ref');
+  const saved = localStorage.getItem('me');
+  if (saved){ me = JSON.parse(saved); afterLogin(); }
+}
+
+async function login(){
+  try{
+    me = await api('/api/login', {method:'POST', body: JSON.stringify({pin: $('pin').value})});
+    localStorage.setItem('me', JSON.stringify(me));
+    afterLogin();
+  }catch(e){ toast(e.message, true); }
+}
+
+function afterLogin(){
+  $('who').textContent = me.name + ' · ' + me.role;
+  $('logout').classList.remove('hide');
+  $('selLine').innerHTML = ref.lines
+    .map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  if (me.line_id) $('selLine').value = me.line_id;
+  fillStations();
+  show('scPick');
+}
+
+$('logout').onclick = () => { localStorage.clear(); location.reload(); };
+
+function fillStations(){
+  const lineId = +$('selLine').value;
+  $('selStation').innerHTML = ref.stations.filter(s => s.line_id === lineId)
+    .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+async function openStation(){
+  const id = +$('selStation').value;
+  ctx = await api('/api/station/' + id + '/context');
+  station = ctx.station;
+  $('ttl').textContent = station.name;
+
+  shift = await api('/api/shift/current?line_id=' + station.line_id);
+  if (!shift) shift = await api('/api/shift/open',
+    {method:'POST', body: JSON.stringify({line_id: station.line_id, worker_id: me.id})});
+
+  $('selProduct').innerHTML = ctx.products.length
+    ? ctx.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+    : '<option value="">— marshrutda mahsulot yo\'q —</option>';
+  $('selDefect').innerHTML = ref.defectReasons
+    .map(r => `<option value="${r.code}">${r.name}</option>`).join('');
+  $('selDowntime').innerHTML = ref.downtimeReasons
+    .map(r => `<option value="${r.code}">${r.name}</option>`).join('');
+  $('selOrigin').innerHTML = '<option value="">— aniqlanmagan —</option>' +
+    ref.stations.filter(s => s.line_id === station.line_id)
+      .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  dt = ctx.openDowntime; renderDowntime(); renderQueue();
+  setCnt(0); log = []; renderLog();
+  show('scWork');
+}
+
+function renderQueue(){
+  const p = ctx.products.find(x => x.id === +$('selProduct').value);
+  $('queueInfo').textContent = p
+    ? `Marshrut qadami ${p.step_no} · oldida navbat: ${p.queue_qty} dona` : '';
+}
+
+const setCnt = v => { cnt = Math.max(0, v); $('cnt').textContent = cnt; };
+const bump  = v => setCnt(cnt + v);
+
+async function submitOk(){
+  if (!cnt) return toast('Miqdor 0', true);
+  const product_id = +$('selProduct').value;
+  if (!product_id) return toast('Mahsulot tanlanmagan', true);
+  try{
+    const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
+      shift_id: shift.id, station_id: station.id, product_id,
+      qty_ok: cnt, worker_id: me.id })});
+    log.unshift({id: r.id, t: 'ok', qty: cnt,
+      name: $('selProduct').selectedOptions[0].text});
+    renderLog(); toast(cnt + ' dona yozildi'); setCnt(0);
+  }catch(e){ toast(e.message, true); }
+}
+
+async function submitDefect(){
+  const qty = +$('defQty').value, product_id = +$('selProduct').value;
+  if (!qty || !product_id) return toast('Ma\'lumot to\'liq emas', true);
+  try{
+    const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
+      shift_id: shift.id, station_id: station.id, product_id,
+      qty_defect: qty, defect_reason: $('selDefect').value,
+      origin_station_id: $('selOrigin').value || null, worker_id: me.id })});
+    log.unshift({id: r.id, t: 'bad', qty, name: $('selDefect').selectedOptions[0].text});
+    renderLog(); toast('Brak yozildi');
+  }catch(e){ toast(e.message, true); }
+}
+
+async function startDowntime(){
+  dt = await api('/api/downtime/start', {method:'POST', body: JSON.stringify({
+    shift_id: shift.id, station_id: station.id,
+    reason_code: $('selDowntime').value, worker_id: me.id })});
+  renderDowntime();
+}
+async function stopDowntime(){
+  await api('/api/downtime/' + dt.id + '/stop', {method:'POST', body:'{}'});
+  dt = null; renderDowntime(); toast('To\'xtash yakunlandi');
+}
+function renderDowntime(){
+  $('dtIdle').classList.toggle('hide', !!dt);
+  $('dtActive').classList.toggle('hide', !dt);
+  if (dt) $('dtSince').textContent =
+    new Date(dt.started_at).toLocaleTimeString('uz-UZ', {hour:'2-digit',minute:'2-digit'}) + ' dan';
+}
+
+async function undo(id){
+  await api('/api/flow/' + id, {method:'DELETE'});
+  log = log.filter(x => x.id !== id); renderLog(); toast('Bekor qilindi');
+}
+
+function renderLog(){
+  $('logBody').innerHTML = log.length ? log.map(x => `
+    <tr><td><span class="tag ${x.t === 'ok' ? 'ok' : 'bad'}">${x.t === 'ok' ? 'OK' : 'BRAK'}</span></td>
+        <td>${x.name}</td><td class="num">${x.qty}</td>
+        <td class="num"><button onclick="undo(${x.id})">Bekor</button></td></tr>`).join('')
+    : '<tr><td class="muted">Hozircha yozuv yo\'q</td></tr>';
+}
+
+boot();
+</script>
+</body>
+</html>
