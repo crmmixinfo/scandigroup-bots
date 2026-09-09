@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS sections (
   code    TEXT UNIQUE NOT NULL,
   name    TEXT NOT NULL,
   sort    INT  NOT NULL DEFAULT 0,
-  is_exit BOOLEAN NOT NULL DEFAULT false,   -- omborga topshirish nuqtasi
+  is_exit BOOLEAN NOT NULL DEFAULT false,   -- tayyor mahsulot omboriga chiqish nuqtasi
+  -- Rejadagi kunlik quvvat (dona/kun). Muddat bashorati uchun ishlatiladi
+  -- FAQAT real tarix hali yo'q paytda; tarix paydo bo'lgach fakt ustun turadi.
+  capacity_per_day NUMERIC(10,2),
   active  BOOLEAN NOT NULL DEFAULT true
 );
 CREATE INDEX IF NOT EXISTS idx_sections_shop ON sections(shop_id);
@@ -121,6 +124,32 @@ CREATE TABLE IF NOT EXISTS set_items (
   PRIMARY KEY (set_product_id, item_product_id)
 );
 
+-- ============================================================================
+--  DETALIROVKA UCHUN JOY — hozircha bo'sh, keyingi bosqichda to'ldiriladi.
+--
+--  Bugun kuzatuv SKU darajasida: "Milano vitrina — 30 dona Freza bo'limida".
+--  Detalirovka kiritilgach kuzatuvni DETAL darajasiga tushirish mumkin
+--  ("Milano vitrina yon panel — 60 dona"), va buning uchun schema tayyor:
+--    · product_parts — detal ro'yxati, har detal o'z marshrutiga ega bo'lishi mumkin
+--    · flow_log.part_id — qaysi detal o'tgani (hozir NULL, SKU darajasi ishlaydi)
+--  Ikkisi birga ishlaydi: part_id NULL bo'lsa yozuv butun SKU ga tegishli.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS product_parts (
+  id                SERIAL PRIMARY KEY,
+  product_id        INT  NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  part_no           TEXT,                      -- detalirovka raqami / chizma kodi
+  name              TEXT NOT NULL,             -- "Yon panel", "Eshik", "Tokcha"
+  material          TEXT,                      -- LDSP 16mm, MDF 18mm, massiv ...
+  size_mm           TEXT,                      -- "1800x400x16"
+  qty_per_product   NUMERIC(10,3) NOT NULL DEFAULT 1,
+  -- Detal butun mahsulotdan boshqa yo'ldan yurishi mumkin (masalan faqat
+  -- eshik bo'yaladi, korpus bo'yalmaydi) — shuning uchun alohida marshrut.
+  route_template_id INT REFERENCES route_templates(id),
+  note              TEXT,
+  UNIQUE (product_id, part_no)
+);
+CREATE INDEX IF NOT EXISTS idx_parts_product ON product_parts(product_id);
+
 -- Fason istisnosi: shu SKU shu bo'limga KIRMAYDI
 CREATE TABLE IF NOT EXISTS product_route_skip (
   product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -181,6 +210,8 @@ CREATE TABLE IF NOT EXISTS flow_log (
   shift_id   INT  NOT NULL REFERENCES shifts(id),
   section_id INT  NOT NULL REFERENCES sections(id),
   product_id INT  NOT NULL REFERENCES products(id),
+  -- Detalirovka kiritilgach to'ldiriladi. NULL → yozuv butun SKU ga tegishli.
+  part_id    INT  REFERENCES product_parts(id),
   qty_ok     INT  NOT NULL DEFAULT 0,
   qty_defect INT  NOT NULL DEFAULT 0,
   worker_id  INT  REFERENCES workers(id),
@@ -378,3 +409,130 @@ FROM paint_batches b
 JOIN chambers c ON c.id = b.chamber_id
 WHERE b.ended_at IS NOT NULL
 GROUP BY c.id, c.name, b.work_date;
+
+-- ============================================================================
+--  ZAVOD KO'RINISHI — "hozir nima qayerda va qachon o'tadi"
+-- ============================================================================
+
+-- ★ JOYLASHUV: har SKU ning nechta donasi qaysi tsex/bo'lim oldida turibdi.
+--   "Milano vitrina · Korpus tsexi · Freza oldida 22 dona"
+CREATE OR REPLACE VIEW v_position AS
+SELECT w.product_id, p.sku, p.name AS product, g.name AS group_name,
+       pl.line_name, sh.id AS shop_id, sh.name AS shop, sh.sort AS shop_sort,
+       sc.id AS section_id, sc.name AS section, sc.sort AS section_sort,
+       w.step_no, w.queue_qty AS qty
+FROM v_wip w
+JOIN products p        ON p.id = w.product_id
+JOIN product_groups g  ON g.id = p.group_id
+JOIN v_product_line pl ON pl.product_id = w.product_id
+JOIN sections sc       ON sc.id = w.section_id
+JOIN shops sh          ON sh.id = sc.shop_id
+WHERE w.queue_qty > 0;
+
+-- Bo'limning kunlik o'tkazish quvvati (dona/kun).
+--   'fakt' — oxirgi 14 kundagi real o'rtacha (ishlangan kunlar bo'yicha)
+--   'reja' — tarix yo'q, sections.capacity_per_day ishlatildi
+--   'yo''q' — ikkalasi ham yo'q, muddat bashorat qilinmaydi
+CREATE OR REPLACE VIEW v_section_rate AS
+WITH obs AS (
+  SELECT f.section_id,
+         SUM(f.qty_ok)::numeric / NULLIF(COUNT(DISTINCT s.work_date), 0) AS rate
+  FROM flow_log f
+  JOIN shifts s ON s.id = f.shift_id
+  WHERE s.work_date >= CURRENT_DATE - INTERVAL '14 days' AND f.qty_ok > 0
+  GROUP BY f.section_id
+)
+SELECT sc.id AS section_id, sc.name AS section,
+       COALESCE(o.rate, sc.capacity_per_day) AS rate_per_day,
+       CASE WHEN o.rate IS NOT NULL           THEN 'fakt'
+            WHEN sc.capacity_per_day IS NOT NULL THEN 'reja'
+            ELSE 'yo''q' END AS rate_source
+FROM sections sc
+LEFT JOIN obs o ON o.section_id = sc.id;
+
+-- Joylashuvdan oldinga qolgan marshrut (muddat hisobi uchun yordamchi)
+CREATE OR REPLACE VIEW v_position_rem AS
+SELECT ps.product_id, ps.section_id AS at_section_id, ps.qty, ps.shop_id AS at_shop_id,
+       r.step_no AS rem_step, sc.shop_id AS rem_shop_id, rt.rate_per_day
+FROM v_position ps
+JOIN v_product_route r ON r.product_id = ps.product_id AND r.step_no >= ps.step_no
+JOIN sections sc       ON sc.id = r.section_id
+JOIN v_section_rate rt ON rt.section_id = r.section_id;
+
+-- ★ MUDDAT BASHORATI.
+--
+--   Oqim liniyasida partiya bo'limlardan ketma-ket emas, quvur (pipeline)
+--   bo'lib o'tadi: birinchi dona oxirgi bo'limga yetguncha keyingilari
+--   orqadan kelaveradi. Shuning uchun taxmin ikki qismdan iborat:
+--
+--     MAX(qty / rate)  — eng tor bo'lim butun partiyani o'tkazish vaqti
+--   + SUM(1 / rate)    — bitta dona quvurdan o'tish vaqti (to'ldirish)
+--
+--   Bu klassik flow-shop makespan yaqinlashuvi. Kalendar kun beradi,
+--   ish kuni emas — dam olish kunlari hisobga olinmagan.
+CREATE OR REPLACE VIEW v_position_eta AS
+WITH brk AS (   -- tsex almashadigan birinchi qadam
+  SELECT product_id, at_section_id, MIN(rem_step) AS change_step
+  FROM v_position_rem
+  WHERE rem_shop_id <> at_shop_id
+  GROUP BY product_id, at_section_id
+),
+nxt AS (
+  SELECT b.product_id, b.at_section_id, b.change_step, sh.name AS next_shop
+  FROM brk b
+  JOIN v_position_rem r ON r.product_id = b.product_id
+                       AND r.at_section_id = b.at_section_id
+                       AND r.rem_step = b.change_step
+  JOIN shops sh ON sh.id = r.rem_shop_id
+  GROUP BY b.product_id, b.at_section_id, b.change_step, sh.name
+)
+SELECT r.product_id, r.at_section_id, MIN(r.qty) AS qty,
+       n.next_shop,
+       ROUND(MAX(r.qty / NULLIF(r.rate_per_day, 0))
+             + SUM(1.0 / NULLIF(r.rate_per_day, 0)), 1) AS eta_fg_days,
+       ROUND(MAX(r.qty / NULLIF(r.rate_per_day, 0))
+               FILTER (WHERE n.change_step IS NULL OR r.rem_step < n.change_step)
+             + SUM(1.0 / NULLIF(r.rate_per_day, 0))
+               FILTER (WHERE n.change_step IS NULL OR r.rem_step < n.change_step), 1)
+         AS eta_next_shop_days,
+       BOOL_OR(r.rate_per_day IS NULL) AS rate_missing
+FROM v_position_rem r
+LEFT JOIN nxt n ON n.product_id = r.product_id AND n.at_section_id = r.at_section_id
+GROUP BY r.product_id, r.at_section_id, n.next_shop, n.change_step;
+
+-- Tsexlar kesimida jami: nechta dona qaysi tsexda turibdi
+CREATE OR REPLACE VIEW v_shop_load AS
+SELECT sh.id AS shop_id, sh.name AS shop, sh.is_shared, sh.sort,
+       COALESCE(SUM(ps.qty), 0) AS qty,
+       COUNT(DISTINCT ps.product_id) AS sku_count
+FROM shops sh
+LEFT JOIN sections sc ON sc.shop_id = sh.id
+LEFT JOIN v_position ps ON ps.section_id = sc.id
+GROUP BY sh.id, sh.name, sh.is_shared, sh.sort;
+
+-- Oxirgi harakatlar: "qachon o'tdi" tarixi
+CREATE OR REPLACE VIEW v_movements AS
+SELECT f.id, f.ts, p.sku, p.name AS product, pl.line_name,
+       sh.name AS shop, sc.name AS section,
+       f.qty_ok, f.qty_defect, w.name AS worker, sc.is_exit
+FROM flow_log f
+JOIN products p        ON p.id = f.product_id
+JOIN v_product_line pl ON pl.product_id = f.product_id
+JOIN sections sc       ON sc.id = f.section_id
+JOIN shops sh          ON sh.id = sc.shop_id
+LEFT JOIN workers w    ON w.id = f.worker_id;
+
+-- Bitta SKU ning marshruti bo'ylab holati: qayerdan o'tdi, qachon, nechta
+CREATE OR REPLACE VIEW v_product_progress AS
+SELECT r.product_id, r.step_no, sc.id AS section_id, sc.name AS section,
+       sh.name AS shop, sh.is_shared, sc.is_exit,
+       COALESCE(t.qty_ok, 0)     AS passed_qty,
+       COALESCE(t.qty_defect, 0) AS defect_qty,
+       COALESCE(GREATEST(w.queue_qty, 0), 0) AS queue_qty,
+       (SELECT MAX(f.ts) FROM flow_log f
+         WHERE f.product_id = r.product_id AND f.section_id = r.section_id) AS last_ts
+FROM v_product_route r
+JOIN sections sc ON sc.id = r.section_id
+JOIN shops sh    ON sh.id = sc.shop_id
+LEFT JOIN v_section_totals t ON t.product_id = r.product_id AND t.section_id = r.section_id
+LEFT JOIN v_wip w            ON w.product_id = r.product_id AND w.section_id = r.section_id;

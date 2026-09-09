@@ -180,3 +180,23 @@ INSERT INTO workers (name, pin, role, shop_id) VALUES
   ('Qadoqlash ustasi', '3333', 'master', (SELECT id FROM shops WHERE code='QADOQ')),
   ('Stul ustasi',      '4444', 'master', (SELECT id FROM shops WHERE code='STUL'))
 ON CONFLICT (pin) DO NOTHING;
+
+-- ============================================================================
+--  MUDDAT BASHORATI UCHUN QUVVAT (ixtiyoriy, lekin tavsiya etiladi)
+--
+--  Zavod ko'rinishidagi "qachon keyingi tsexga o'tadi / qachon omborga kiradi"
+--  hisobi bo'lim quvvatiga (dona/kun) tayanadi. Tizim uni ikki manbadan oladi:
+--
+--    1. FAKT — oxirgi 14 kundagi real o'rtacha. Ustuvor manba.
+--    2. REJA — sections.capacity_per_day. Ishga tushishning birinchi
+--       haftalarida, fakt hali yig'ilmagan paytda ishlatiladi.
+--
+--  Qiymat kiritilmasa, o'sha bo'lim uchun muddat ko'rsatilmaydi (panel buni
+--  ochiq aytadi). Ishga tushishdan oldin taxminiy quvvatni kiriting:
+--
+--    UPDATE sections SET capacity_per_day = 120 WHERE code = 'KOR-ARRA';
+--    UPDATE sections SET capacity_per_day = 80  WHERE code = 'BOY-RANG';
+--
+--  Real fakt yig'ilgach bu qiymatlar avtomatik ustunlikni yo'qotadi —
+--  ularni keyin tozalash shart emas.
+-- ============================================================================

@@ -299,6 +299,68 @@ app.get('/api/dashboard', wrap(async (req, res) => {
   });
 }));
 
+// ══════════════════════════════════════ ZAVOD KO'RINISHI
+// "Hozir nima qayerda, qachon keyingi tsexga o'tadi, qachon omborga kiradi"
+app.get('/api/factory', wrap(async (req, res) => {
+  const { line_id, group_id, q } = req.query;
+
+  const [shopLoad, positions, movements, fgStock, rateHealth] = await Promise.all([
+    db.query(`SELECT * FROM v_shop_load ORDER BY sort`),
+    db.query(
+      `SELECT ps.product_id, ps.sku, ps.product, ps.group_name, ps.line_name,
+              ps.shop, ps.shop_sort, ps.section, ps.section_sort, ps.step_no, ps.qty,
+              e.next_shop, e.eta_next_shop_days, e.eta_fg_days, e.rate_missing,
+              (SELECT MAX(f.ts) FROM flow_log f
+                WHERE f.product_id = ps.product_id
+                  AND f.section_id IN (SELECT section_id FROM v_product_route r2
+                                        WHERE r2.product_id = ps.product_id
+                                          AND r2.step_no = ps.step_no - 1)) AS arrived_at
+         FROM v_position ps
+         LEFT JOIN v_position_eta e
+                ON e.product_id = ps.product_id AND e.at_section_id = ps.section_id
+        WHERE ($1::int IS NULL OR ps.line_name = (SELECT name FROM lines WHERE id = $1))
+          AND ($2::int IS NULL OR ps.group_name = (SELECT name FROM product_groups WHERE id = $2))
+          AND ($3::text IS NULL OR ps.product ILIKE '%' || $3 || '%' OR ps.sku ILIKE '%' || $3 || '%')
+        ORDER BY ps.shop_sort, ps.section_sort, ps.qty DESC`,
+      [line_id || null, group_id || null, q || null]),
+    db.query(`SELECT * FROM v_movements ORDER BY ts DESC LIMIT 30`),
+    db.query(
+      `SELECT p.sku, p.name AS product, g.name AS group_name, s.qty, s.updated_at
+         FROM fg_stock s
+         JOIN products p       ON p.id = s.product_id
+         JOIN product_groups g ON g.id = p.group_id
+        WHERE s.qty > 0 ORDER BY s.qty DESC`),
+    // Bashorat ishonchliligi: nechta bo'limda real fakt bor, nechtasida yo'q
+    db.query(`SELECT rate_source, COUNT(*) AS n FROM v_section_rate GROUP BY rate_source`),
+  ]);
+
+  res.json({
+    shopLoad: shopLoad.rows,
+    positions: positions.rows,
+    movements: movements.rows,
+    fgStock: fgStock.rows,
+    rateHealth: rateHealth.rows,
+  });
+}));
+
+// Bitta SKU: marshrut bo'ylab to'liq holat
+app.get('/api/product/:id/progress', wrap(async (req, res) => {
+  const [product, progress] = await Promise.all([
+    db.query(
+      `SELECT p.id, p.sku, p.name, p.is_set, g.name AS group_name, pl.line_name,
+              rt.name AS route_name
+         FROM products p
+         JOIN product_groups g   ON g.id = p.group_id
+         JOIN v_product_line pl  ON pl.product_id = p.id
+         LEFT JOIN route_templates rt ON rt.id = p.route_template_id
+        WHERE p.id = $1`, [req.params.id]),
+    db.query(`SELECT * FROM v_product_progress WHERE product_id = $1 ORDER BY step_no`,
+      [req.params.id]),
+  ]);
+  if (!product.rows[0]) return res.status(404).json({ error: 'Mahsulot topilmadi' });
+  res.json({ product: product.rows[0], progress: progress.rows });
+}));
+
 app.get('/api/wip', wrap(async (_req, res) => {
   const { rows } = await db.query(
     `SELECT p.name AS product, pl.line_name, sc.name AS section, sh.name AS shop,

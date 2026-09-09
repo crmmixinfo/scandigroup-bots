@@ -43,6 +43,54 @@ Marshrut tartibi `route_steps.sort` da yozilgani uchun bu muammo tug'dirmaydi.
 Operator smenani tanlamaydi: umumiy tsexda u ikkala yo'nalish mahsulotini ishlaydi,
 tizim smenani **mahsulot yo'nalishidan** aniqlaydi (`resolveShift`).
 
+## Zavod ko'rinishi — `/zavod.html`
+
+Asosiy nazorat ekrani: **hozir nima qayerda**.
+
+- Tsexlar bo'ylab oqim: har tsexda nechta dona turibdi
+- Har SKU bo'yicha: qaysi tsex, qaysi bo'lim, nechta dona, qachon kelgan
+- **Qachon keyingi tsexga o'tadi** va **qachon omborga kiradi** — taxminiy muddat
+- Mahsulot ustiga bosilsa — marshrut bo'ylab to'liq yo'l (qaysi bo'limdan
+  nechta o'tgan, qachon, qancha brak)
+- Tayyor mahsulot ombori va oxirgi harakatlar tarixi
+
+### Muddat qanday hisoblanadi
+
+Oqim liniyasida partiya bo'limlardan ketma-ket emas, quvur (pipeline) bo'lib o'tadi.
+Shuning uchun taxmin ikki qismdan iborat:
+
+```
+MAX(qty / rate)   -- eng tor bo'lim butun partiyani o'tkazish vaqti
++ SUM(1 / rate)   -- bitta dona quvurdan o'tish vaqti
+```
+
+`rate` — bo'limning kunlik o'tkazish quvvati, ikki manbadan:
+
+| Manba | Qachon | Qayerda |
+|---|---|---|
+| **Fakt** | oxirgi 14 kundagi real o'rtacha — ustuvor | `flow_log` dan hisoblanadi |
+| **Reja** | fakt hali yo'q (ishga tushish davri) | `sections.capacity_per_day` |
+
+Ikkalasi ham yo'q bo'lsa muddat ko'rsatilmaydi — panel buni ochiq aytadi
+("N bo'limda quvvat ma'lumoti yo'q"). Muddat kalendar kunda, dam olish
+kunlari hisobga olinmagan.
+
+## Detalirovka uchun qoldirilgan joy
+
+Bugun kuzatuv **SKU darajasida**: "Milano vitrina — 30 dona Freza bo'limida".
+Detalirovka tayyor bo'lgach kuzatuvni **detal darajasiga** tushirish mumkin, va
+buning uchun schema allaqachon tayyor:
+
+| Joy | Nima uchun |
+|---|---|
+| `product_parts` | Detal ro'yxati: raqam, nom, material, o'lcham, dona/mahsulot |
+| `product_parts.route_template_id` | Detal butun mahsulotdan boshqa yo'ldan yurishi mumkin (masalan faqat eshik bo'yaladi) |
+| `flow_log.part_id` | Qaysi detal o'tgani. Hozir NULL — yozuv butun SKU ga tegishli |
+| `set_items` | To'plam tarkibi: to'plam → pozitsiyalar |
+
+Ikkisi birga ishlaydi: `part_id` NULL bo'lsa yozuv SKU darajasida qoladi, ya'ni
+detalirovka bosqichma-bosqich kiritilishi mumkin — hammasi birdan emas.
+
 ## Uchta o'lchov, uchta maqsad
 
 | O'lchov | Nima ko'rsatadi | Qayerda |
@@ -64,8 +112,9 @@ ko'rinmaydi. `v_set_blockers` aynan qaysi pozitsiya bloklab turganini ko'rsatadi
 | `seed.sql` | Tsexlar, bo'limlar, marshrut shablonlari, brak/prostoy kodlari |
 | `seed-sku.sql` | 17 fason, 32 SKU (mehmonxona, yotoqxona, stol, stul) |
 | `api.js` | Express API |
+| `public/zavod.html` | Zavod ko'rinishi — nima qayerda, qachon o'tadi |
+| `public/dashboard.html` | Ko'rsatkichlar paneli |
 | `public/terminal.html` | Tsex planshet terminali |
-| `public/dashboard.html` | Rahbariyat paneli |
 
 ## Ishga tushirish
 
@@ -81,8 +130,9 @@ DATABASE_URL=... npm run production      # -> http://localhost:3000
 
 | Sahifa | Kim uchun |
 |---|---|
-| `/terminal.html` | Tsex planshetlari — PIN, dona qayd etish, brak, to'xtash, kamera partiyasi |
+| `/zavod.html` | Rahbariyat — nima qayerda, qachon keyingi tsexga o'tadi, qachon omborga kiradi |
 | `/dashboard.html` | Rahbariyat — reja/fakt, bottleneck, komplektlilik, umumiy tsex yuklamasi |
+| `/terminal.html` | Tsex planshetlari — PIN, dona qayd etish, brak, to'xtash, kamera partiyasi |
 
 Demo PIN: `1111` `2222` `3333` `4444` (`seed.sql` dagi test xodimlari).
 
@@ -91,7 +141,9 @@ Demo PIN: `1111` `2222` `3333` `4444` (`seed.sql` dagi test xodimlari).
 **1-faza — ishga tushirishdan oldin.** To'plam tarkibini kiritish (`set_items`) —
 komplektlilik hisoboti shusiz ishlamaydi, `seed-sku.sql` oxirida to'liq misol bor.
 Fasonlarning real marshrutlarini biriktirish. Kamera sig'imi va quritish siklini
-(`chambers`) to'ldirish. **Normani (`route_steps.norma_min`) bo'sh qoldiring.**
+(`chambers`) to'ldirish. Muddat bashorati birinchi kundan ishlashi uchun
+`sections.capacity_per_day` ga taxminiy quvvatni kiriting — real fakt yig'ilgach u
+avtomatik ustunlikni yo'qotadi. **Normani (`route_steps.norma_min`) bo'sh qoldiring.**
 
 **2-faza — 1-oy.** Faqat ma'lumot yig'iladi, faqat tsex chegaralarida
 (`shops.track_sections = false`): Korpus chiqishi, Bo'yoqlash chiqishi, Qadoqlash
@@ -111,6 +163,7 @@ Bo'yoqlash umumiy resurs bo'lgani uchun bottleneck deyarli aniq o'sha yerda chiq
   (`hr-bot.js` dagi `MINI_APP_URL` mexanizmi bilan bir xil).
 - **To'plam tarkibi** — `set_items` bo'sh. Har to'plam qaysi pozitsiyalardan iborat
   ekani kiritilishi kerak; marshrutdan pozitsiyalar o'tadi, to'plamning o'zi emas.
+- **Detalirovka** — `product_parts` bo'sh, jadval tayyor. Yuqoridagi bo'limga qarang.
 - **Fason marshrutlari** — barcha stol va stullarga hozir `L1-FULL` / `L2-FULL`
   biriktirilgan. Qaysi fason qaysi bo'limga kirmasligi aniqlangach tuzatiladi.
 - **`track_sections` bayrog'i** hozir faqat spravochnikda; terminalda filtrlash

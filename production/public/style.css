@@ -60,3 +60,26 @@ label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);
   background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
   padding:14px 22px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+
+/* Zavod ko'rinishi — oqim xaritasi va modal */
+.flow{display:flex;align-items:stretch;gap:10px;overflow-x:auto;padding-bottom:4px}
+.flow .step{flex:1;min-width:170px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px}
+.flow .step.shared{border-color:rgba(201,162,39,.45)}
+.flow .arrow{display:flex;align-items:center;color:var(--muted);font-size:20px;flex:0 0 auto}
+.flow .qty{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2;
+  font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;
+  align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto;z-index:50}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:24px;max-width:820px;width:100%}
+.track{position:relative;padding-left:22px}
+.track .node{position:relative;padding:0 0 16px 0}
+.track .node::before{content:'';position:absolute;left:-22px;top:6px;width:9px;height:9px;
+  border-radius:50%;background:var(--surface-2);border:2px solid var(--line)}
+.track .node.done::before{background:var(--ok);border-color:var(--ok)}
+.track .node.here::before{background:var(--accent);border-color:var(--accent)}
+.track .node:not(:last-child)::after{content:'';position:absolute;left:-18px;top:18px;
+  bottom:0;width:1px;background:var(--line)}

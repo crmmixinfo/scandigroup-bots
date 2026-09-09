@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zavod ko'rinishi · Scandi</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Zavod ko'rinishi</h1></div>
+  <div class="row">
+    <span class="muted" id="stamp"></span>
+    <button onclick="load()">Yangilash</button>
+  </div>
+</div>
+
+<!-- Tsexlar bo'ylab oqim -->
+<div class="flow" id="flow"></div>
+
+<!-- Filtrlar -->
+<div class="card" style="margin-top:16px">
+  <div class="row" style="flex-wrap:wrap;gap:12px">
+    <div style="flex:1;min-width:180px">
+      <label>Yo'nalish</label><select id="fLine" onchange="load()"></select></div>
+    <div style="flex:1;min-width:180px">
+      <label>Guruh</label><select id="fGroup" onchange="load()"></select></div>
+    <div style="flex:2;min-width:220px">
+      <label>Mahsulot qidirish</label>
+      <input id="fQ" placeholder="Milano, STL-LAURA ..." oninput="debounced()"></div>
+  </div>
+</div>
+
+<!-- ★ Asosiy jadval: nima qayerda -->
+<div class="card" style="margin-top:16px">
+  <h2>Mahsulot joylashuvi</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mahsulot</th><th>Tsex</th><th>Bo'lim</th><th class="num">Dona</th>
+        <th>Kelgan</th><th>Keyingi tsex</th><th class="num">Muddat</th>
+        <th class="num">Omborga</th>
+      </tr></thead>
+      <tbody id="tPos"></tbody>
+    </table>
+  </div>
+  <p class="muted" style="margin-top:12px;font-size:13px" id="etaNote"></p>
+</div>
+
+<div class="grid g2" style="margin-top:16px">
+  <div class="card">
+    <h2>Tayyor mahsulot ombori</h2>
+    <table><thead><tr><th>Mahsulot</th><th>Guruh</th><th class="num">Dona</th>
+      <th>Oxirgi kirim</th></tr></thead><tbody id="tFg"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Oxirgi harakatlar</h2>
+    <div style="max-height:420px;overflow:auto">
+      <table><thead><tr><th>Vaqt</th><th>Mahsulot</th><th>Bo'lim</th>
+        <th class="num">Dona</th></tr></thead><tbody id="tMov"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const n = v => Number(v ?? 0).toLocaleString('uz-UZ');
+const empty = (c, t) => `<tr><td class="muted" colspan="${c}">${t}</td></tr>`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let ref = null, timer = null;
+const debounced = () => { clearTimeout(timer); timer = setTimeout(load, 350); };
+
+// Muddat: kun soni → "3.2 kun · 12-sen"
+const MONTHS = ['yan','fev','mar','apr','may','iyn','iyl','avg','sen','okt','noy','dek'];
+function eta(days){
+  if (days === null || days === undefined) return '<span class="muted">—</span>';
+  const d = Number(days);
+  const dt = new Date(Date.now() + Math.ceil(d) * 864e5);
+  const cls = d <= 1 ? 'ok' : d <= 5 ? 'warn' : 'bad';
+  return `<span class="tag ${cls}">${d.toFixed(1)} kun</span>
+          <span class="muted" style="font-size:12px"> · ${dt.getDate()}-${MONTHS[dt.getMonth()]}</span>`;
+}
+function ago(ts){
+  if (!ts) return '<span class="muted">—</span>';
+  const h = (Date.now() - new Date(ts)) / 36e5;
+  if (h < 1) return Math.round(h * 60) + ' daq oldin';
+  if (h < 24) return Math.round(h) + ' soat oldin';
+  return Math.round(h / 24) + ' kun oldin';
+}
+
+async function boot(){
+  ref = await fetch('/api/ref').then(r => r.json());
+  $('fLine').innerHTML = '<option value="">Barcha yo\'nalish</option>' +
+    ref.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  const groups = [...new Map(ref.products.map(p =>
+    [p.group_name, p])).values()];
+  $('fGroup').innerHTML = '<option value="">Barcha guruh</option>' +
+    groups.map(g => `<option value="${g.group_id}">${esc(g.group_name)}</option>`).join('');
+  load();
+}
+
+async function load(){
+  const p = new URLSearchParams();
+  if ($('fLine').value)  p.set('line_id', $('fLine').value);
+  if ($('fGroup').value) p.set('group_id', $('fGroup').value);
+  if ($('fQ').value.trim()) p.set('q', $('fQ').value.trim());
+
+  const d = await fetch('/api/factory?' + p).then(r => r.json());
+  $('stamp').textContent = new Date().toLocaleTimeString('uz-UZ',
+    {hour:'2-digit', minute:'2-digit'});
+
+  // Tsexlar bo'ylab oqim
+  $('flow').innerHTML = d.shopLoad.map((s, i) => `
+    ${i ? '<div class="arrow">→</div>' : ''}
+    <div class="step ${s.is_shared ? 'shared' : ''}">
+      <h2>${esc(s.shop)}${s.is_shared ? ' <span class="tag">umumiy</span>' : ''}</h2>
+      <div class="qty">${n(s.qty)}</div>
+      <div class="muted" style="font-size:13px">dona · ${n(s.sku_count)} SKU</div>
+    </div>`).join('');
+
+  // ★ Joylashuv
+  $('tPos').innerHTML = d.positions.length ? d.positions.map(r => `
+    <tr class="click" onclick="openProduct(${r.product_id})">
+      <td>${esc(r.product)}<div class="muted" style="font-size:12px">${esc(r.sku)}</div></td>
+      <td class="muted">${esc(r.shop)}</td>
+      <td>${esc(r.section)}<div class="muted" style="font-size:12px">${r.step_no}-qadam</div></td>
+      <td class="num">${n(r.qty)}</td>
+      <td class="muted" style="font-size:13px">${ago(r.arrived_at)}</td>
+      <td class="muted">${r.next_shop ? esc(r.next_shop) : '<span class="tag ok">oxirgi tsex</span>'}</td>
+      <td class="num">${eta(r.eta_next_shop_days)}</td>
+      <td class="num">${eta(r.eta_fg_days)}</td>
+    </tr>`).join('') : empty(8, 'Ishlab chiqarishda mahsulot yo\'q');
+
+  // Bashorat ishonchliligi — nimaga asoslanayotgani ochiq aytiladi
+  const h = Object.fromEntries(d.rateHealth.map(r => [r.rate_source, Number(r.n)]));
+  const parts = [];
+  if (h.fakt)  parts.push(`${h.fakt} bo'lim — real fakt bo'yicha`);
+  if (h.reja)  parts.push(`${h.reja} bo'lim — rejadagi quvvat bo'yicha`);
+  if (h["yo'q"]) parts.push(`${h["yo'q"]} bo'limda quvvat ma'lumoti yo'q — muddat hisoblanmaydi`);
+  $('etaNote').textContent = 'Muddat taxminiy, kalendar kunda. ' + parts.join(' · ') + '.';
+
+  $('tFg').innerHTML = d.fgStock.length ? d.fgStock.map(r => `
+    <tr><td>${esc(r.product)}</td><td class="muted">${esc(r.group_name)}</td>
+      <td class="num">${n(r.qty)}</td>
+      <td class="muted" style="font-size:13px">${ago(r.updated_at)}</td></tr>`).join('')
+    : empty(4, 'Ombor bo\'sh');
+
+  $('tMov').innerHTML = d.movements.length ? d.movements.map(r => `
+    <tr><td class="muted" style="font-size:13px">${new Date(r.ts)
+        .toLocaleString('uz-UZ', {day:'2-digit', month:'2-digit',
+                                  hour:'2-digit', minute:'2-digit'})}</td>
+      <td>${esc(r.product)}</td>
+      <td class="muted">${esc(r.section)}${r.is_exit
+        ? ' <span class="tag ok">omborga</span>' : ''}</td>
+      <td class="num">${r.qty_defect > 0
+        ? `<span class="tag bad">${n(r.qty_defect)} brak</span>` : n(r.qty_ok)}</td></tr>`).join('')
+    : empty(4, 'Harakat yo\'q');
+}
+
+// Bitta SKU: marshrut bo'ylab to'liq yo'l
+async function openProduct(id){
+  const d = await fetch('/api/product/' + id + '/progress').then(r => r.json());
+  const here = d.progress.findIndex(s => Number(s.queue_qty) > 0);
+  $('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h1>${esc(d.product.name)}</h1><button onclick="closeModal()">Yopish</button></div>
+        <p class="muted" style="margin-bottom:20px">${esc(d.product.sku)} ·
+          ${esc(d.product.group_name)} · ${esc(d.product.route_name || 'marshrut biriktirilmagan')}</p>
+        <div class="track">${d.progress.map((s, i) => `
+          <div class="node ${i === here ? 'here' : Number(s.passed_qty) > 0 ? 'done' : ''}">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <strong>${s.step_no}. ${esc(s.section)}</strong>
+                ${s.is_exit ? ' <span class="tag ok">ombor</span>' : ''}
+                <div class="muted" style="font-size:12px">${esc(s.shop)}</div>
+              </div>
+              <div style="text-align:right">
+                <div>${n(s.passed_qty)} dona o'tgan${Number(s.queue_qty) > 0
+                  ? ` · <span class="tag warn">${n(s.queue_qty)} navbatda</span>` : ''}</div>
+                <div class="muted" style="font-size:12px">${ago(s.last_ts)}${
+                  Number(s.defect_qty) > 0 ? ` · ${n(s.defect_qty)} brak` : ''}</div>
+              </div>
+            </div>
+          </div>`).join('')}</div>
+      </div>
+    </div>`;
+}
+const closeModal = () => { $('modalRoot').innerHTML = ''; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+boot();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
