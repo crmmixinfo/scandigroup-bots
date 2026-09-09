@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scandi ERP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="/app.js"></script>
@@ -31,9 +32,18 @@ const PAGES = [
   { href:'/dashboard.html', title:'Boshqaruv paneli', lead:"Ko'rsatkichlar",
     text:"Reja/fakt · bottleneck · komplektlilik · umumiy tsex yuklamasi · Pareto",
     perm:['production.view'] },
+  { href:'/smena.html', title:'Smena kiritish', lead:'Tsex boshliqlari uchun',
+    text:"Bir tsexning barcha bo'limlari bo'yicha kunlik ma'lumotni bitta jadvalda kiritish",
+    perm:['production.entry'] },
   { href:'/terminal.html', title:"Bo'lim terminali", lead:'Tsex planshetlari',
     text:"Dona qayd etish · brak · to'xtash · kamera partiyasi",
     perm:['production.entry'] },
+  { href:'/xodimlar.html', title:'Xodimlar', lead:'Rollar va kirish',
+    text:"Xodim qo'shish, PIN berish, rol va tsex biriktirish",
+    perm:['admin.users'] },
+  { href:'/sozlamalar.html', title:'Bo\'lim quvvati', lead:'Muddat bashorati',
+    text:"Har bo'limning kunlik quvvati — muddat hisobi shunga tayanadi",
+    perm:['production.manage'] },
 ];
 
 App.start(async () => {

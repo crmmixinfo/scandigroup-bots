@@ -138,7 +138,20 @@ Operator smenani tanlamaydi — tizim uni mahsulot yo'nalishidan aniqlaydi.
 |---|---|---|
 | `/zavod.html` | Nima qayerda, qachon keyingi tsexga o'tadi, qachon omborga kiradi | `production.view` |
 | `/dashboard.html` | Reja/fakt, bottleneck, komplektlilik, umumiy tsex yuklamasi, Pareto | `production.view` |
-| `/terminal.html` | Tsex planshetlari: dona, brak, to'xtash, kamera partiyasi | `production.entry` |
+| `/smena.html` | **Tsex boshlig'i**: bir tsexning barcha bo'limlari bo'yicha kunlik kiritish | `production.entry` |
+| `/terminal.html` | Tsex planshetlari: bo'lim bo'yicha real vaqtda kiritish | `production.entry` |
+| `/sozlamalar.html` | Bo'lim quvvati — muddat bashorati shunga tayanadi | `production.manage` |
+| `/xodimlar.html` | Xodim, PIN, rol va tsex biriktirish | `admin.users` |
+
+### Ikki xil kiritish usuli
+
+Bir xil ma'lumot, ikki xil ish uslubi — tsex o'zi tanlaydi:
+
+- **`/smena.html`** — tsex boshlig'i smena oxirida bitta jadvalda hammasini kiritadi.
+  Odatda faqat navbatda turgan mahsulotlar ko'rsatiladi, "bugun kiritilgan" ustuni
+  takror kiritishdan saqlaydi. Boshlash uchun eng qulay usul.
+- **`/terminal.html`** — bo'lim planshetida real vaqtda: +1 / +5 / +10 tugmalari,
+  brak, to'xtash sekundomeri, bo'yoqlash kamerasi partiyasi.
 
 ## Muddat qanday hisoblanadi
 
@@ -184,18 +197,31 @@ bosqichma-bosqich kiritilishi mumkin — hammasi birdan emas.
 ## Ishga tushirish
 
 ```bash
+cp .env.example .env        # DATABASE_URL ni to'ldiring
 npm install
-for f in core core-seed production production-seed production-sku; do
-  psql "$DATABASE_URL" -f erp/sql/$f.sql
-done
-DATABASE_URL=... npm run erp        # -> http://localhost:3000
+npm run erp:migrate         # bazani yaratadi; qayta ishga tushirish xavfsiz
+npm run erp                 # -> http://localhost:3000
 ```
 
-`.env`: `DATABASE_URL`, `HR_BOT_TOKEN` (Mini App imzosi uchun),
-ixtiyoriy `PORT`, `SESSION_DAYS`, `PGSSL=off` (lokal Postgres uchun).
+Serverga qo'yish (Railway, Render va shunga o'xshash): `Procfile` da
+`web: node erp/server.js`. Deploy qilishdan oldin bir marta
+`npm run erp:migrate` ishga tushiriladi. `DATABASE_URL` dan boshqa hech narsa
+majburiy emas — Mini App kerak bo'lganda `HR_BOT_TOKEN` qo'shiladi.
 
 Demo PIN: `0000` admin · `5555` direktor · `1111`–`4444` tsex ustalari ·
-`6666` operator.
+`6666` operator. **Birinchi ish — o'z xodimlaringizni kiritib, demo PIN'larni
+o'chirish yoki o'zgartirish** (`/xodimlar.html`).
+
+## Birinchi kun tartibi
+
+1. `npm run erp:migrate` — baza tayyor bo'ladi (4 tsex, 24 bo'lim, 32 SKU).
+2. `/xodimlar.html` — tsex boshliqlarini kiriting, PIN bering, rol va tsex
+   biriktiring. Demo xodimlarni o'chiring.
+3. `/sozlamalar.html` — har bo'limning taxminiy kunlik quvvatini kiriting.
+   Aniq bo'lmasa ham kiriting: muddat bashorati shusiz ishlamaydi, real fakt
+   yig'ilgach bu qiymatlar avtomatik ustunlikni yo'qotadi.
+4. Tsex boshliqlari `/smena.html` da har kuni ma'lumot kiritadi.
+5. Siz `/zavod.html` va `/dashboard.html` dan kuzatasiz.
 
 ## Joriy qilish tartibi
 
@@ -216,14 +242,13 @@ aniqlangan tsexda `track_sections = true` qilinadi.
 
 ## Hali qilinmagan
 
-- **Xodim boshqaruvi UI** — rol biriktirish hozir faqat SQL orqali
-  (`worker_roles`). `admin.users` huquqi bor, sahifa yo'q.
-- **Telegram tugma** — xodimlarga `workers.tg_id` kiritilmagan, shuning
-  uchun Mini App va bot xabarlari hali hech kimga bormaydi.
+- **Telegram** — xodimlarga `workers.tg_id` kiritilmaguncha Mini App va bot
+  xabarlari hech kimga bormaydi. ID ni bot ichida `/myid` bilan olib,
+  `/xodimlar.html` da kiritiladi.
 - **Bot jarayoni** — `notify.sendPending()` tayyor, uni chaqiruvchi bot
   jarayoni yozilmagan (`hr-bot.js` ga o'xshash).
-- **Audit** — jadval va `audit()` yordamchisi tayyor, ishlab chiqarish
-  modulida hali chaqirilmagan (pul tegadigan modullarda majburiy bo'ladi).
+- **Audit** — xodim boshqaruvida ishlaydi, ishlab chiqarish modulida hali
+  chaqirilmagan (pul tegadigan modullarda majburiy bo'ladi).
 - **To'plam tarkibi va detalirovka** — jadvallar bo'sh, yuqoriga qarang.
 - **HTTPS va rate limit** — ishlab chiqarish serveriga qo'yishdan oldin
   reverse proxy (nginx/Caddy) orqali.

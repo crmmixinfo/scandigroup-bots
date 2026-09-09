@@ -15,15 +15,15 @@ const router = express.Router();
 // Smenani MAHSULOT YO'NALISHI bo'yicha topadi yoki ochadi.
 // Umumiy bo'yoqlash tsexida operator ikkala yo'nalish mahsulotini ishlaydi —
 // smenani u tanlamaydi, tizim mahsulotdan aniqlaydi.
-async function resolveShift(client, productId, shiftNo = 1, workerId = null) {
+async function resolveShift(client, productId, shiftNo = 1, workerId = null, workDate = null) {
   const line = (await client.query(
     `SELECT line_id FROM v_product_line WHERE product_id = $1`, [productId])).rows[0];
   if (!line) throw new Error('Mahsulot yo\'nalishi aniqlanmadi');
   const { rows } = await client.query(
     `INSERT INTO shifts (work_date, shift_no, line_id, opened_by)
-     VALUES (CURRENT_DATE, $1, $2, $3)
+     VALUES (COALESCE($4::date, CURRENT_DATE), $1, $2, $3)
      ON CONFLICT (work_date, shift_no, line_id) DO UPDATE SET closed_at = NULL
-     RETURNING id`, [shiftNo, line.line_id, workerId]);
+     RETURNING id`, [shiftNo, line.line_id, workerId, workDate]);
   return rows[0].id;
 }
 
@@ -280,6 +280,134 @@ router.get('/dashboard', need('production.view'), wrap(async (req, res) => {
     sectionDaily: sectionDaily.rows,
     chamberLoad: chamberLoad.rows,
   });
+}));
+
+// ═════════════════════════════════════════════ SOZLAMALAR: BO'LIM QUVVATI
+// Muddat bashorati real fakt yig'ilmaguncha shu qiymatlarga tayanadi.
+router.get('/sections/capacity', need('production.manage'), wrap(async (_req, res) => {
+  const { rows } = await db.query(
+    `SELECT sc.id, sc.code, sc.name, sc.sort, sc.capacity_per_day,
+            sh.id AS shop_id, sh.name AS shop, sh.sort AS shop_sort,
+            r.rate_per_day, r.rate_source
+       FROM sections sc
+       JOIN shops sh          ON sh.id = sc.shop_id
+       JOIN v_section_rate r  ON r.section_id = sc.id
+      WHERE sc.active
+      ORDER BY sh.sort, sc.sort`);
+  res.json(rows);
+}));
+
+router.patch('/sections/capacity', need('production.manage'), wrap(async (req, res) => {
+  const { items = [] } = req.body;
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    for (const it of items) {
+      await client.query(`UPDATE sections SET capacity_per_day = $2 WHERE id = $1`,
+        [it.id, it.capacity_per_day === '' || it.capacity_per_day == null
+                ? null : Number(it.capacity_per_day)]);
+    }
+    await client.query('COMMIT');
+    res.json({ saved: items.length });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally { client.release(); }
+}));
+
+// ═══════════════════════════════════ TSEX BOSHLIG'I: SMENA KIRITISH
+// Bitta tsexning barcha bo'limlari bo'yicha kiritish jadvali.
+// Faqat marshruti shu bo'limdan o'tadigan mahsulotlar chiqadi.
+router.get('/shop/:id/entry', need('production.entry'), wrap(async (req, res) => {
+  const shopId = Number(req.params.id);
+  const date = req.query.date || today();
+  const shiftNo = Number(req.query.shift_no || 1);
+
+  const shop = (await db.query(`SELECT * FROM shops WHERE id = $1`, [shopId])).rows[0];
+  if (!shop) return res.status(404).json({ error: 'Tsex topilmadi' });
+
+  // Usta o'z tsexidan boshqasiga yoza olmaydi (worker_roles.scope_shop_id)
+  const scope = req.user.scope_shop_ids;
+  if (scope.length && !scope.includes(shopId))
+    return res.status(403).json({ error: 'Bu tsex sizning doirangizda emas' });
+
+  const rows = (await db.query(
+    `SELECT sc.id AS section_id, sc.name AS section, sc.sort AS section_sort,
+            p.id AS product_id, p.sku, p.name AS product, pl.line_name,
+            r.step_no,
+            COALESCE(GREATEST(w.queue_qty, 0), 0) AS queue_qty,
+            COALESCE(e.qty_ok, 0)     AS entered_ok,
+            COALESCE(e.qty_defect, 0) AS entered_defect
+       FROM sections sc
+       JOIN v_product_route r ON r.section_id = sc.id
+       JOIN products p        ON p.id = r.product_id
+       JOIN v_product_line pl ON pl.product_id = p.id
+       LEFT JOIN v_wip w ON w.product_id = p.id AND w.section_id = sc.id
+       LEFT JOIN (
+         SELECT f.section_id, f.product_id,
+                SUM(f.qty_ok) AS qty_ok, SUM(f.qty_defect) AS qty_defect
+           FROM flow_log f JOIN shifts s ON s.id = f.shift_id
+          WHERE s.work_date = $2::date AND s.shift_no = $3
+          GROUP BY f.section_id, f.product_id
+       ) e ON e.section_id = sc.id AND e.product_id = p.id
+      WHERE sc.shop_id = $1 AND sc.active
+      ORDER BY sc.sort, pl.line_name, p.name`, [shopId, date, shiftNo])).rows;
+
+  res.json({ shop, date, shift_no: shiftNo, rows });
+}));
+
+// Ommaviy saqlash: bitta smenaning barcha yozuvlari bitta tranzaksiyada
+router.post('/flow/bulk', need('production.entry'), wrap(async (req, res) => {
+  const { entries = [], shift_no = 1, work_date = null } = req.body;
+  if (!Array.isArray(entries) || !entries.length)
+    return res.status(400).json({ error: 'Kiritilgan qator yo\'q' });
+
+  const bad = entries.find((e) => Number(e.qty_defect) > 0 && !e.defect_reason);
+  if (bad) return res.status(400).json({ error: 'Brak uchun sabab kodi majburiy' });
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    let saved = 0;
+    for (const e of entries) {
+      const qtyOk = Number(e.qty_ok) || 0;
+      const qtyDef = Number(e.qty_defect) || 0;
+      if (!qtyOk && !qtyDef) continue;
+
+      const shiftId = await resolveShift(client, e.product_id, shift_no, req.user.id, work_date);
+      const flow = (await client.query(
+        `INSERT INTO flow_log (shift_id, section_id, product_id, qty_ok, qty_defect, worker_id)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [shiftId, e.section_id, e.product_id, qtyOk, qtyDef, req.user.id])).rows[0];
+
+      if (qtyDef > 0) {
+        await client.query(
+          `INSERT INTO defects (flow_log_id, work_date, section_id, product_id,
+                                reason_code, qty, origin_section_id)
+           VALUES ($1, COALESCE($2::date, CURRENT_DATE), $3,$4,$5,$6,$7)`,
+          [flow.id, work_date, e.section_id, e.product_id, e.defect_reason, qtyDef,
+           e.origin_section_id || null]);
+      }
+
+      const isExit = (await client.query(
+        `SELECT is_exit FROM sections WHERE id = $1`, [e.section_id])).rows[0]?.is_exit;
+      if (isExit && qtyOk > 0) {
+        await client.query(
+          `INSERT INTO fg_stock (product_id, qty, updated_at) VALUES ($1,$2,NOW())
+           ON CONFLICT (product_id) DO UPDATE
+             SET qty = fg_stock.qty + EXCLUDED.qty, updated_at = NOW()`,
+          [e.product_id, qtyOk]);
+      }
+      saved++;
+    }
+    await client.query('COMMIT');
+    res.json({ saved });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }));
 
 // ══════════════════════════════════════ ZAVOD KO'RINISHI

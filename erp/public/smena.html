@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smena kiritish · Scandi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Smena kiritish</h1></div>
+  <div class="row" id="erpUser"></div>
+</div>
+
+<div class="card">
+  <div class="row" style="flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <div style="flex:2;min-width:200px"><label>Tsex</label><select id="fShop"></select></div>
+    <div style="flex:1;min-width:150px"><label>Sana</label><input id="fDate" type="date"></div>
+    <div style="flex:1;min-width:130px"><label>Smena</label>
+      <select id="fShift"><option value="1">1-smena</option><option value="2">2-smena</option></select></div>
+    <button class="primary" onclick="load()">Ochish</button>
+  </div>
+  <div class="row" style="margin-top:14px;gap:16px">
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;
+                  letter-spacing:0;font-size:14px;color:var(--text);margin:0;cursor:pointer">
+      <input type="checkbox" id="fAll" style="width:auto" onchange="render()">
+      Navbatda turmagan mahsulotlarni ham ko'rsatish</label>
+    <span class="muted" id="counter"></span>
+  </div>
+</div>
+
+<div id="body"></div>
+
+<div class="card hide" id="saveBar"
+     style="position:sticky;bottom:16px;margin-top:16px;
+            box-shadow:0 -8px 32px rgba(0,0,0,.4)">
+  <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div><strong id="sumText"></strong>
+      <div class="muted" style="font-size:13px">Saqlangandan keyin hisobotlarga darrov tushadi</div></div>
+    <div class="row">
+      <button onclick="load()">Bekor qilish</button>
+      <button class="primary" id="btnSave" onclick="save()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const n = v => Number(v ?? 0).toLocaleString('uz-UZ');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let ref = null, data = null;
+$('fDate').value = new Date().toISOString().slice(0, 10);
+
+async function boot(me){
+  ref = await App.api('/api/ref');
+  const scope = me.scope_shop_ids || [];
+  const shops = scope.length ? ref.shops.filter(s => scope.includes(s.id)) : ref.shops;
+  if (!shops.length){
+    $('body').innerHTML = '<div class="card"><p class="muted">Sizga tsex biriktirilmagan.</p></div>';
+    return;
+  }
+  $('fShop').innerHTML = shops.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  load();
+}
+
+async function load(){
+  const p = new URLSearchParams({ date: $('fDate').value, shift_no: $('fShift').value });
+  data = await App.api(`/api/shop/${$('fShop').value}/entry?` + p);
+  render();
+}
+
+function render(){
+  const all = $('fAll').checked;
+  // Odatda faqat navbatda turgan yoki bugun kiritilgan mahsulotlar ko'rsatiladi —
+  // aks holda 32 SKU × 9 bo'lim ro'yxat bo'lib ketadi.
+  const rows = data.rows.filter(r => all || Number(r.queue_qty) > 0
+    || Number(r.entered_ok) > 0 || Number(r.entered_defect) > 0);
+  $('counter').textContent = `${rows.length} qator${all ? '' : ` (jami ${data.rows.length})`}`;
+
+  if (!rows.length){
+    $('body').innerHTML = `<div class="card"><p class="muted">
+      Bu tsexda navbatda turgan mahsulot yo'q. Barchasini ko'rish uchun
+      yuqoridagi belgini qo'ying.</p></div>`;
+    $('saveBar').classList.add('hide');
+    return;
+  }
+
+  const bySection = new Map();
+  rows.forEach(r => {
+    if (!bySection.has(r.section_id)) bySection.set(r.section_id, { name: r.section, rows: [] });
+    bySection.get(r.section_id).rows.push(r);
+  });
+
+  $('body').innerHTML = [...bySection.entries()].map(([sid, sec]) => `
+    <div class="card" style="margin-top:16px">
+      <h2>${esc(sec.name)}</h2>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>Mahsulot</th><th class="num">Navbatda</th><th class="num">Bugun kiritilgan</th>
+          <th class="num" style="width:110px">Tayyor</th>
+          <th class="num" style="width:110px">Brak</th>
+          <th style="width:190px">Brak sababi</th>
+        </tr></thead>
+        <tbody>${sec.rows.map(r => `
+          <tr data-sec="${sid}" data-prod="${r.product_id}">
+            <td>${esc(r.product)}<div class="muted" style="font-size:12px">${esc(r.sku)}</div></td>
+            <td class="num">${Number(r.queue_qty) > 0
+              ? `<span class="tag warn">${n(r.queue_qty)}</span>` : '<span class="muted">0</span>'}</td>
+            <td class="num muted">${n(r.entered_ok)}${Number(r.entered_defect) > 0
+              ? ` · ${n(r.entered_defect)} brak` : ''}</td>
+            <td><input class="ok"  type="number" min="0" placeholder="0" oninput="sum()"></td>
+            <td><input class="bad" type="number" min="0" placeholder="0" oninput="sum()"></td>
+            <td><select class="rsn">
+              <option value="">—</option>
+              ${ref.defectReasons.map(x =>
+                `<option value="${x.code}">${esc(x.name)}</option>`).join('')}
+            </select></td>
+          </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`).join('');
+  sum();
+}
+
+function collect(){
+  return [...document.querySelectorAll('tr[data-prod]')].map(tr => ({
+    section_id: +tr.dataset.sec,
+    product_id: +tr.dataset.prod,
+    qty_ok: +tr.querySelector('.ok').value || 0,
+    qty_defect: +tr.querySelector('.bad').value || 0,
+    defect_reason: tr.querySelector('.rsn').value || null,
+  })).filter(e => e.qty_ok || e.qty_defect);
+}
+
+function sum(){
+  const e = collect();
+  const ok = e.reduce((s, x) => s + x.qty_ok, 0);
+  const bad = e.reduce((s, x) => s + x.qty_defect, 0);
+  $('saveBar').classList.toggle('hide', !e.length);
+  $('sumText').textContent = `${e.length} qator · ${n(ok)} dona tayyor` +
+    (bad ? ` · ${n(bad)} brak` : '');
+}
+
+async function save(){
+  const entries = collect();
+  if (!entries.length) return;
+  const missing = entries.find(e => e.qty_defect > 0 && !e.defect_reason);
+  if (missing) return alert('Brak kiritilgan qatorda sabab tanlanishi kerak.');
+
+  $('btnSave').disabled = true;
+  try{
+    const r = await App.api('/api/flow/bulk', { method:'POST', body: JSON.stringify({
+      entries, shift_no: +$('fShift').value, work_date: $('fDate').value })});
+    await load();
+    alert(`Saqlandi: ${r.saved} qator.`);
+  }catch(e){ alert(e.message); }
+  finally{ $('btnSave').disabled = false; }
+}
+
+App.start(boot, 'production.entry');
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sozlamalar · Scandi ERP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js"></script>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Bo'lim quvvati</h1></div>
+  <div class="row" id="erpUser"></div>
+</div>
+
+<div class="card">
+  <p class="muted">
+    Zavod ko'rinishidagi <strong>"qachon keyingi tsexga o'tadi"</strong> va
+    <strong>"qachon omborga kiradi"</strong> hisobi bo'lim quvvatiga tayanadi.
+    Tizim uni ikki manbadan oladi:
+  </p>
+  <p style="margin-top:10px">
+    <span class="tag ok">fakt</span> oxirgi 14 kundagi real o'rtacha — ustuvor manba ·
+    <span class="tag warn">reja</span> pastda kiritilgan qiymat, fakt hali yig'ilmagan paytda ·
+    <span class="tag bad">yo'q</span> muddat hisoblanmaydi
+  </p>
+  <p class="muted" style="margin-top:10px;font-size:13px">
+    Taxminiy raqam ham hech qanaqasidan yaxshi: real fakt yig'ilgach bu qiymatlar
+    avtomatik ustunlikni yo'qotadi, ularni keyin tozalash shart emas.
+  </p>
+</div>
+
+<div id="body"></div>
+
+<div class="card hide" id="saveBar" style="position:sticky;bottom:16px;margin-top:16px;
+     box-shadow:0 -8px 32px rgba(0,0,0,.4)">
+  <div class="row" style="justify-content:space-between">
+    <strong id="sumText"></strong>
+    <div class="row"><button onclick="load()">Bekor qilish</button>
+      <button class="primary" id="btnSave" onclick="save()">Saqlash</button></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TAG = { fakt:'ok', reja:'warn', "yo'q":'bad' };
+let rows = [];
+
+async function load(){
+  rows = await App.api('/api/sections/capacity');
+  const byShop = new Map();
+  rows.forEach(r => {
+    if (!byShop.has(r.shop_id)) byShop.set(r.shop_id, { name: r.shop, rows: [] });
+    byShop.get(r.shop_id).rows.push(r);
+  });
+  $('body').innerHTML = [...byShop.values()].map(sh => `
+    <div class="card" style="margin-top:16px">
+      <h2>${esc(sh.name)}</h2>
+      <table><thead><tr><th>Bo'lim</th><th>Hozirgi manba</th>
+        <th class="num">Amaldagi quvvat</th>
+        <th class="num" style="width:170px">Rejadagi quvvat (dona/kun)</th></tr></thead>
+        <tbody>${sh.rows.map(r => `
+          <tr><td>${esc(r.name)}</td>
+            <td><span class="tag ${TAG[r.rate_source]}">${esc(r.rate_source)}</span></td>
+            <td class="num muted">${r.rate_per_day ? Math.round(r.rate_per_day) : '—'}</td>
+            <td><input class="cap" data-id="${r.id}" type="number" min="0" step="1"
+                       value="${r.capacity_per_day ?? ''}" placeholder="—" oninput="sum()"></td>
+          </tr>`).join('')}</tbody></table>
+    </div>`).join('');
+  sum(true);
+}
+
+function changed(){
+  return [...document.querySelectorAll('.cap')].filter(i => {
+    const r = rows.find(x => x.id === +i.dataset.id);
+    const was = r.capacity_per_day == null ? '' : String(Number(r.capacity_per_day));
+    const now = i.value.trim() === '' ? '' : String(Number(i.value));
+    return was !== now;
+  }).map(i => ({ id: +i.dataset.id, capacity_per_day: i.value.trim() }));
+}
+
+function sum(){
+  const c = changed();
+  $('saveBar').classList.toggle('hide', !c.length);
+  $('sumText').textContent = `${c.length} bo'lim o'zgartirildi`;
+}
+
+async function save(){
+  const items = changed();
+  if (!items.length) return;
+  $('btnSave').disabled = true;
+  try{ await App.api('/api/sections/capacity',
+        { method:'PATCH', body: JSON.stringify({ items }) }); await load(); }
+  catch(e){ alert(e.message); }
+  finally{ $('btnSave').disabled = false; }
+}
+
+App.start(load, 'production.manage');
+</script>
+</body>
+</html>

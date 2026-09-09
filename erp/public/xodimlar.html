@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xodimlar · Scandi ERP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js"></script>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Xodimlar va rollar</h1></div>
+  <div class="row"><button class="primary" onclick="openForm()">Xodim qo'shish</button>
+    <span class="row" id="erpUser"></span></div>
+</div>
+
+<div class="card">
+  <h2>Xodimlar</h2>
+  <div style="overflow-x:auto"><table>
+    <thead><tr><th>Ism</th><th>PIN</th><th>Telegram ID</th><th>Rollar</th>
+      <th>Holat</th><th></th></tr></thead>
+    <tbody id="tW"></tbody>
+  </table></div>
+  <p class="muted" style="margin-top:12px;font-size:13px">
+    Rol o'zgartirilsa yoki xodim o'chirilsa uning sessiyalari bekor qilinadi —
+    yangi huquq darhol kuchga kiradi.</p>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Rollar</h2>
+  <div style="overflow-x:auto"><table>
+    <thead><tr><th>Rol</th><th>Ko'rinish</th><th class="num">Huquqlar</th></tr></thead>
+    <tbody id="tR"></tbody>
+  </table></div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SURFACE = { web:'Sayt', miniapp:'Telegram ilova', bot:'Bot xabari' };
+
+let meta = null, workers = [];
+
+async function load(){
+  [meta, workers] = await Promise.all([
+    App.api('/api/admin/roles'), App.api('/api/admin/workers')]);
+
+  $('tW').innerHTML = workers.map(w => `
+    <tr>
+      <td>${esc(w.name)}${w.phone ? `<div class="muted" style="font-size:12px">${esc(w.phone)}</div>` : ''}</td>
+      <td class="muted">${w.pin ? esc(w.pin) : '—'}</td>
+      <td class="muted">${w.tg_id ? esc(w.tg_id) : '<span class="tag warn">ulanmagan</span>'}</td>
+      <td>${w.roles.length ? w.roles.map(r =>
+        `<span class="tag">${esc(r.name)}${r.scope_shop ? ' · ' + esc(r.scope_shop) : ''}</span>`
+        ).join(' ') : '<span class="tag bad">rol yo\'q</span>'}</td>
+      <td>${w.active ? '<span class="tag ok">faol</span>' : '<span class="tag">o\'chirilgan</span>'}</td>
+      <td class="num"><button onclick="openForm(${w.id})">Tahrirlash</button></td>
+    </tr>`).join('');
+
+  $('tR').innerHTML = meta.roles.map(r => `
+    <tr><td>${esc(r.name)}<div class="muted" style="font-size:12px">${esc(r.code)}</div></td>
+      <td class="muted">${SURFACE[r.surface] || r.surface}</td>
+      <td class="num">${r.permission_count}</td></tr>`).join('');
+}
+
+function openForm(id){
+  const w = id ? workers.find(x => x.id === id) : null;
+  const checked = (code) => w?.roles.some(r => r.code === code);
+  const scopeOf = (code) => w?.roles.find(r => r.code === code)?.scope_shop_id || '';
+
+  $('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this)close_()">
+      <div class="modal" style="max-width:640px">
+        <div class="row" style="justify-content:space-between;margin-bottom:18px">
+          <h1>${w ? 'Xodimni tahrirlash' : "Yangi xodim"}</h1>
+          <button onclick="close_()">Yopish</button></div>
+        <div class="stack">
+          <div><label>Ism familiya</label>
+            <input id="wName" value="${esc(w?.name || '')}"></div>
+          <div class="row" style="gap:12px">
+            <div style="flex:1"><label>Telefon</label>
+              <input id="wPhone" value="${esc(w?.phone || '')}" placeholder="+998..."></div>
+            <div style="flex:1"><label>PIN (4-6 raqam)</label>
+              <input id="wPin" inputmode="numeric" value="${esc(w?.pin || '')}"></div>
+          </div>
+          <div><label>Telegram ID <span style="text-transform:none">— bot ichida
+            /myid yozib olinadi</span></label>
+            <input id="wTg" inputmode="numeric" value="${esc(w?.tg_id || '')}"></div>
+
+          <div><label>Rollar</label>
+            <div class="stack" style="gap:8px">
+              ${meta.roles.map(r => `
+                <div class="row" style="gap:10px;align-items:center">
+                  <input type="checkbox" style="width:auto" class="role" value="${r.code}"
+                         ${checked(r.code) ? 'checked' : ''}>
+                  <span style="flex:1">${esc(r.name)}
+                    <span class="muted" style="font-size:12px">· ${SURFACE[r.surface]}</span></span>
+                  <select class="scope" data-role="${r.code}" style="width:190px">
+                    <option value="">Barcha tsex</option>
+                    ${meta.shops.map(s => `<option value="${s.id}"
+                      ${String(scopeOf(r.code)) === String(s.id) ? 'selected' : ''}
+                      >${esc(s.name)}</option>`).join('')}
+                  </select>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          ${w ? `<div class="row" style="gap:10px;align-items:center">
+            <input type="checkbox" id="wActive" style="width:auto" ${w.active ? 'checked' : ''}>
+            <span>Faol</span></div>` : ''}
+
+          <button class="primary" onclick="save(${id || 'null'})">Saqlash</button>
+        </div>
+      </div>
+    </div>`;
+}
+const close_ = () => { $('modalRoot').innerHTML = ''; };
+
+async function save(id){
+  const roles = [...document.querySelectorAll('.role:checked')].map(cb => ({
+    code: cb.value,
+    scope_shop_id: document.querySelector(`.scope[data-role="${cb.value}"]`).value || null,
+  }));
+  const body = {
+    name:  $('wName').value.trim(),
+    phone: $('wPhone').value.trim() || null,
+    pin:   $('wPin').value.trim() || null,
+    tg_id: $('wTg').value.trim() || null,
+    roles,
+  };
+  if (id) body.active = $('wActive').checked;
+  try{
+    await App.api(id ? '/api/admin/workers/' + id : '/api/admin/workers',
+      { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+    close_(); load();
+  }catch(e){ alert(e.message); }
+}
+
+App.start(load, 'admin.users');
+</script>
+</body>
+</html>
