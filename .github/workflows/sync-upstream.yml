@@ -1,0 +1,47 @@
+# Fork'ni asosiy repozitoriyaga tenglashtiradi.
+#
+# Railway fork'dan deploy qiladi, kod esa shu repozitoriyaga yoziladi.
+# Bu ish o'rtadagi qo'lda "Sync fork" bosishni yo'q qiladi.
+#
+# Faqat fork'da ishlaydi — pastdagi shart asosiy repozitoriyada
+# bekorga yurishining oldini oladi.
+name: Sync fork from upstream
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository != 'crmmixinfo/scandigroup-bots'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Upstream'ni olish
+        run: |
+          git remote add upstream https://github.com/crmmixinfo/scandigroup-bots.git
+          git fetch upstream main
+
+      - name: Fast-forward va push
+        run: |
+          # Faqat fast-forward. Fork'da o'z commiti bo'lsa ish TO'XTAYDI —
+          # jim turib uni yo'qotib yuborgandan ko'ra xato bergani ma'qul.
+          if git merge-base --is-ancestor HEAD upstream/main; then
+            git merge --ff-only upstream/main
+            git push origin main
+          else
+            echo "main ajralib ketgan yoki upstream'dan oldinda — qo'lda ko'rish kerak"
+            exit 1
+          fi
