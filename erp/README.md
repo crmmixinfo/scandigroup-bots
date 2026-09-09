@@ -174,7 +174,7 @@ Ikki xil kuzatuv birligi bir bazada yashaydi:
 | Model | Birlik | Kim uchun |
 |---|---|---|
 | **Jamlanma** | dona / bo'lim | Tsex boshlig'i: "Freza bo'limidan 30 dona o'tdi" |
-| **Konveyer birligi** | raqamli birlik | Ishlab chiqarish boshlig'i: "K-2026-0001 qayerda, kimga ketadi" |
+| **Konveyer birligi** | raqamli birlik | Ishlab chiqarish boshlig'i: "K26-0001 qayerda, kimga ketadi" |
 
 Konveyer birligi o'tkazilganda tizim **jamlanma yozuvni ham** yozadi, shuning
 uchun zavod ko'rinishi, panel va Pareto hisobotlari ikkala usulda ham to'g'ri
@@ -188,9 +188,9 @@ Sana · Konveyer № · Zakaz № · Mahsulot · Turi · Soni · Tsex · Bo'lim 
 Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
 ```
 
-- **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K-2026-0001`
+- **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K26-0001`
   shaklida avtomatik taklif qilinadi. Raqam **butun to'plamga** qo'yiladi:
-  "Milano PK — K-2026-0001". To'plam bir butun bo'lib liniyadan o'tadi,
+  "Milano PK — K26-0001". To'plam bir butun bo'lib liniyadan o'tadi,
   shuning uchun to'plamning o'zi marshrutga ega.
 - **Zakaz №** — savdo bo'limi zakaz tushganda qo'yadi. Bir mijoz mehmonxona
   to'plami + stol + stul olsa, uchalasiga bitta zakaz raqami qo'yiladi va

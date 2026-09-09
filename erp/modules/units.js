@@ -129,13 +129,20 @@ router.get('/orders', need('production.view'), wrap(async (_req, res) => {
   res.json(rows);
 }));
 
-// Keyingi konveyer raqamini taklif qiladi: K-2026-0001
-router.get('/next-no', need(...UNITS), wrap(async (_req, res) => {
-  const year = new Date().getFullYear();
-  const { rows } = await db.query(
+// Konveyer raqami: K26-0001 — yil ikki raqam, so'ng yillik tartib raqami.
+// Raqam ikki joyda beriladi (taklif va saqlash), shuning uchun format
+// shu yerda bir marta yozilgan: ikkisi ajralib ketmasin.
+// Tranzaksiya ichidan chaqirilsa o'sha tranzaksiyaning `client` ini uzating.
+async function nextConveyorNo(client = db) {
+  const prefix = `K${String(new Date().getFullYear()).slice(-2)}-`;
+  const { rows } = await client.query(
     `SELECT COALESCE(MAX(SUBSTRING(conveyor_no FROM '\\d+$')::int), 0) + 1 AS n
-       FROM production_units WHERE conveyor_no LIKE $1`, [`K-${year}-%`]);
-  res.json({ conveyor_no: `K-${year}-${String(rows[0].n).padStart(4, '0')}` });
+       FROM production_units WHERE conveyor_no LIKE $1`, [`${prefix}%`]);
+  return prefix + String(rows[0].n).padStart(4, '0');
+}
+
+router.get('/next-no', need(...UNITS), wrap(async (_req, res) => {
+  res.json({ conveyor_no: await nextConveyorNo() });
 }));
 
 router.get('/:id/history', need('production.view'), wrap(async (req, res) => {
@@ -169,11 +176,7 @@ router.post('/', need(...UNITS), wrap(async (req, res) => {
       if (!it.product_id) throw new Error('Mahsulot tanlanmagan');
       // Raqam bo'sh qoldirilsa server o'zi beradi
       if (!it.conveyor_no || !String(it.conveyor_no).trim()) {
-        const year = new Date().getFullYear();
-        const n = (await client.query(
-          `SELECT COALESCE(MAX(SUBSTRING(conveyor_no FROM '\\d+$')::int), 0) + 1 AS n
-             FROM production_units WHERE conveyor_no LIKE $1`, [`K-${year}-%`])).rows[0].n;
-        it.conveyor_no = `K-${year}-${String(n).padStart(4, '0')}`;
+        it.conveyor_no = await nextConveyorNo(client);
       }
 
       // Bo'lim berilsa, u mahsulot marshrutida borligini tekshiramiz

@@ -93,7 +93,7 @@ ON CONFLICT (sku) DO NOTHING;
 -- ============================================================================
 --  TO'PLAM BIR BUTUN BO'LIB LINIYADAN O'TADI
 --
---  Konveyer raqami butun to'plamga qo'yiladi ("Milano PK — K-2026-0001"),
+--  Konveyer raqami butun to'plamga qo'yiladi ("Milano PK — K26-0001"),
 --  alohida pozitsiyalarga emas. Shuning uchun to'plamning o'zi marshrutga
 --  ega bo'lishi kerak.
 --
