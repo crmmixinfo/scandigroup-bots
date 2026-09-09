@@ -47,11 +47,15 @@ INSERT INTO sections (shop_id, code, name, sort) VALUES
   ((SELECT id FROM shops WHERE code='BOYOQ'), 'BOY-PALIR', 'Palirovka',      9)
 ON CONFLICT (code) DO NOTHING;
 
--- QADOQLASH TSEXI (korpus mebel)
+-- QADOQLASH TSEXI (korpus mebel).
+-- Qadoqlash — chiqish nuqtasi (is_exit): shu bo'limdan o'tgan dona tayyor
+-- mahsulot qoldig'iga (fg_stock) tushadi va komplektlilik shundan hisoblanadi.
 INSERT INTO sections (shop_id, code, name, sort, is_exit) VALUES
-  ((SELECT id FROM shops WHERE code='QADOQ'), 'QAD-OYNA', 'Oyna qo''yish',      1, false),
-  ((SELECT id FROM shops WHERE code='QADOQ'), 'QAD-QAD',  'Qadoqlash',          2, false),
-  ((SELECT id FROM shops WHERE code='QADOQ'), 'QAD-OMB',  'Omborga topshirish', 3, true)
+  ((SELECT id FROM shops WHERE code='QADOQ'), 'QAD-OYNA', 'Oyna qo''yish', 1, false)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO sections (shop_id, code, name, sort, is_exit) VALUES
+  ((SELECT id FROM shops WHERE code='QADOQ'), 'QAD-QAD', 'Qadoqlash', 2, true)
 ON CONFLICT (code) DO NOTHING;
 
 -- STUL TSEXI. Marshrut: Rover→Zborka→Shkurka → BO'YOQLASH TSEXI → Qoplash→Qadoqlash,
@@ -108,22 +112,22 @@ ON CONFLICT (code) DO NOTHING;
 SELECT add_route('L1-FULL', ARRAY[
   'KOR-ARRA','KOR-ROVER','KOR-PRESS','KOR-FREZA','KOR-ZBOR','KOR-SHKUR','KOR-KROMK','KOR-PRIS',
   'BOY-AST1','BOY-ASTSH','BOY-AST2','BOY-ABOY','BOY-GRUNT','BOY-GRSH','BOY-RANG','BOY-LAK','BOY-PALIR',
-  'QAD-OYNA','QAD-QAD','QAD-OMB']);
+  'QAD-OYNA','QAD-QAD']);
 
 SELECT add_route('L1-NOPAL', ARRAY[
   'KOR-ARRA','KOR-ROVER','KOR-PRESS','KOR-FREZA','KOR-ZBOR','KOR-SHKUR','KOR-KROMK','KOR-PRIS',
   'BOY-AST1','BOY-ASTSH','BOY-AST2','BOY-ABOY','BOY-GRUNT','BOY-GRSH','BOY-RANG','BOY-LAK',
-  'QAD-OYNA','QAD-QAD','QAD-OMB']);
+  'QAD-OYNA','QAD-QAD']);
 
 SELECT add_route('L1-NOGLAS', ARRAY[
   'KOR-ARRA','KOR-ROVER','KOR-PRESS','KOR-FREZA','KOR-ZBOR','KOR-SHKUR','KOR-KROMK','KOR-PRIS',
   'BOY-AST1','BOY-ASTSH','BOY-AST2','BOY-ABOY','BOY-GRUNT','BOY-GRSH','BOY-RANG','BOY-LAK','BOY-PALIR',
-  'QAD-QAD','QAD-OMB']);
+  'QAD-QAD']);
 
 SELECT add_route('L1-BASE', ARRAY[
   'KOR-ARRA','KOR-ROVER','KOR-PRESS','KOR-FREZA','KOR-ZBOR','KOR-SHKUR','KOR-KROMK','KOR-PRIS',
   'BOY-AST1','BOY-ASTSH','BOY-AST2','BOY-GRUNT','BOY-GRSH','BOY-RANG','BOY-LAK',
-  'QAD-QAD','QAD-OMB']);
+  'QAD-QAD']);
 
 -- Stul: STUL tsexi → UMUMIY BO'YOQLASH (Aboy/Palirovkasiz) → STUL tsexiga qaytadi
 SELECT add_route('L2-FULL', ARRAY[

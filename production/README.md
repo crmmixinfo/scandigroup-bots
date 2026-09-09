@@ -14,7 +14,7 @@ TSEX  →  BO'LIM  →  (mahsulot marshruti)
 |---|---|
 | **Korpus** | Arra · Rover · Press · Freza · Zborka · Shkurka · Kromka · Prisadka |
 | **Bo'yoqlash** *(umumiy)* | Astar sepish 1 · Astar shkurka · Astar sepish 2 · Aboy · Grunt sepish · Grunt shkurka · Rang sepish · Lak · Palirovka |
-| **Qadoqlash** | Oyna qo'yish · Qadoqlash · Omborga topshirish |
+| **Qadoqlash** | Oyna qo'yish · Qadoqlash |
 | **Stul** | Rover · Zborka · Shkurka · Qoplash · Qadoqlash |
 
 ## Ikki asosiy prinsip
@@ -95,7 +95,7 @@ Fasonlarning real marshrutlarini biriktirish. Kamera sig'imi va quritish siklini
 
 **2-faza — 1-oy.** Faqat ma'lumot yig'iladi, faqat tsex chegaralarida
 (`shops.track_sections = false`): Korpus chiqishi, Bo'yoqlash chiqishi, Qadoqlash
-chiqishi, Stul chiqishi. 25 ta bo'limni birdan o'lchash — ma'lumot kiritilmay
+chiqishi, Stul chiqishi. 24 ta bo'limni birdan o'lchash — ma'lumot kiritilmay
 qolishining eng keng tarqalgan sababi.
 
 **3-faza — 2-3-oy.** Real fakt asosida `norma_min` to'ldiriladi. Bottleneck aniqlangan
