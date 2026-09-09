@@ -85,7 +85,7 @@ function addRow(k = 1){
       <tr>
         <td><input class="c-no" value="${n}"></td>
         <td><select class="c-prod">
-          ${ref.products.filter(p => !p.is_set).map(p =>
+          ${ref.products.filter(p => p.route_template_id).map(p =>
             `<option value="${p.id}">${esc(p.name)} · ${esc(p.group_name)}</option>`).join('')}
         </select></td>
         <td><input class="c-qty" type="number" min="1" value="1" oninput="sum()"></td>

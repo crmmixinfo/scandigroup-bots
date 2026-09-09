@@ -8,6 +8,29 @@
 --  production.sql dan KEYIN ishga tushiriladi.
 -- ============================================================================
 
+-- ★ KOMPLEKTLILIK — to'plam bir butun bo'lib ishlab chiqarilgani uchun
+--   qayta yoziladi. Ikki holatni ham qamrab oladi:
+--     · tarkibi kiritilmagan to'plam → omborga tushgan donaning o'zi
+--     · tarkibi kiritilgan to'plam   → eng kam imkon beruvchi pozitsiya
+CREATE OR REPLACE VIEW v_set_completeness AS
+SELECT sp.id AS set_product_id, sp.name AS set_name,
+       CASE
+         WHEN COUNT(si.item_product_id) = 0
+           THEN COALESCE(MAX(own.qty), 0)
+         ELSE MIN(FLOOR(COALESCE(stk.qty,0)::numeric / si.qty))::int
+       END AS complete_sets,
+       CASE
+         WHEN COUNT(si.item_product_id) = 0
+           THEN COALESCE(MAX(own.qty), 0)
+         ELSE SUM(COALESCE(stk.qty,0))
+       END AS items_in_stock
+FROM products sp
+LEFT JOIN set_items si  ON si.set_product_id = sp.id
+LEFT JOIN fg_stock stk  ON stk.product_id = si.item_product_id
+LEFT JOIN fg_stock own  ON own.product_id = sp.id
+WHERE sp.is_set AND sp.active
+GROUP BY sp.id, sp.name;
+
 -- Mijoz keladigan kanal. Alohida spravochnik — keyinchalik "qaysi kanal
 -- qancha sotuv keltirdi" tahlili shu ustunga tayanadi.
 CREATE TABLE IF NOT EXISTS customer_channels (

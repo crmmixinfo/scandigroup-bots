@@ -91,7 +91,22 @@ FROM (VALUES
 ON CONFLICT (sku) DO NOTHING;
 
 -- ============================================================================
---  ★ TO'LDIRISH KERAK: TO'PLAM TARKIBI
+--  TO'PLAM BIR BUTUN BO'LIB LINIYADAN O'TADI
+--
+--  Konveyer raqami butun to'plamga qo'yiladi ("Milano PK — K-2026-0001"),
+--  alohida pozitsiyalarga emas. Shuning uchun to'plamning o'zi marshrutga
+--  ega bo'lishi kerak.
+--
+--  Bu UPDATE seed'dan alohida turadi: yuqoridagi INSERT'lar
+--  ON CONFLICT DO NOTHING bilan yozilgan, ya'ni mavjud qatorlarni
+--  yangilamaydi. Migratsiya har deploy'da qayta ishlagani uchun
+--  bu qator allaqachon kiritilgan to'plamlarni ham tuzatadi.
+UPDATE products SET route_template_id =
+         (SELECT id FROM route_templates WHERE code = 'L1-FULL')
+ WHERE is_set AND route_template_id IS NULL;
+
+-- ============================================================================
+--  TO'PLAM TARKIBI — ixtiyoriy, keyingi bosqich uchun
 --
 --  Komplektlilik hisoboti (v_set_completeness) SHU MA'LUMOTSIZ ISHLAMAYDI.
 --  Har to'plam qaysi pozitsiyalardan iborat ekani kiritilishi kerak, va har

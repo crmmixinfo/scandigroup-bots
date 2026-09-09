@@ -189,7 +189,9 @@ Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
 ```
 
 - **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K-2026-0001`
-  shaklida avtomatik taklif qilinadi.
+  shaklida avtomatik taklif qilinadi. Raqam **butun to'plamga** qo'yiladi:
+  "Milano PK — K-2026-0001". To'plam bir butun bo'lib liniyadan o'tadi,
+  shuning uchun to'plamning o'zi marshrutga ega.
 - **Zakaz №** — savdo bo'limi zakaz tushganda qo'yadi. Bir mijoz mehmonxona
   to'plami + stol + stul olsa, uchalasiga bitta zakaz raqami qo'yiladi va
   jurnalda shu raqam bo'yicha filtrlanadi. Zakaz hali yo'q bo'lsa faqat
@@ -266,7 +268,7 @@ darajasiga** tushirish mumkin, schema tayyor:
 | `product_parts` | Detal ro'yxati: raqam, nom, material, o'lcham, dona/mahsulot |
 | `product_parts.route_template_id` | Detal butun mahsulotdan boshqa yo'ldan yurishi mumkin |
 | `flow_log.part_id` | Qaysi detal o'tgani. Hozir NULL — yozuv SKU ga tegishli |
-| `set_items` | To'plam tarkibi: to'plam → pozitsiyalar |
+| `set_items` | To'plam tarkibi — ixtiyoriy. Bo'sh bo'lsa to'plam bir butun hisoblanadi |
 
 `part_id` NULL bo'lsa yozuv SKU darajasida qoladi, ya'ni detalirovka
 bosqichma-bosqich kiritilishi mumkin — hammasi birdan emas.
