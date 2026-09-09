@@ -13,16 +13,37 @@ Sizga aynan shu kerak.
 ### Railway
 
 1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-2. `crmmixinfo/scandigroup-bots` ni tanlang, branch: `claude/mebel-production-monitoring-nje80r`
-3. Loyihada **+ New** → **Database** → **Add PostgreSQL**
-   → `DATABASE_URL` avtomatik qo'shiladi
-4. Veb-xizmatning **Variables** bo'limiga bitta qator qo'shing:
+2. `crmmixinfo/scandigroup-bots` ni tanlang.
+3. **Settings → Source** da branch'ni `claude/mebel-production-monitoring-nje80r`
+   ga o'zgartiring. Standart holatda `main` turadi, unda ERP yo'q.
+4. Loyihada **+ New** → **Database** → **Add PostgreSQL**.
+5. Dastur xizmatining **Variables** bo'limiga ikkita qator qo'shing:
    ```
+   DATABASE_URL=${{Postgres.DATABASE_URL}}
    ERP_AUTO_MIGRATE=1
    ```
-5. **Settings** → **Networking** → **Generate Domain**
+   Birinchi qator bazani dasturga ulaydi. Railway uni har doim ham o'zi
+   qo'shmaydi — `Variables` ro'yxatida `DATABASE_URL` allaqachon turgan
+   bo'lsa, faqat ikkinchi qatorni qo'shing.
+6. **Settings** → **Networking** → **Generate Domain**.
 
 Tayyor. Manzilni oching, PIN `0000`.
+
+**Deploy logida nima ko'rinishi kerak:**
+```
+Migratsiya bajarildi: {"tsexlar":"4","bolimlar":"24","sku":"32",...}
+Scandi ERP → http://localhost:3000
+```
+Bu ikki qator chiqsa — hammasi joyida.
+
+**Agar xato chiqsa:**
+
+| Logdagi yozuv | Sabab | Yechim |
+|---|---|---|
+| `DATABASE_URL kiritilmagan` | baza ulanmagan | 5-qadamdagi birinchi qatorni qo'shing |
+| `Cannot find module 'telegraf'` yoki bot xatosi | eski branch | 3-qadam: branch'ni tekshiring |
+| `ECONNREFUSED` / `timeout` | baza hali ko'tarilmagan | 1-2 daqiqa kuting, **Redeploy** bosing |
+| `self signed certificate` | SSL sozlamasi | `PGSSL` o'zgaruvchisi qo'shilgan bo'lsa, o'chiring |
 
 Logda quyidagi ko'rinsa hammasi joyida:
 ```
