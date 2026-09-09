@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Katalog · Scandi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
+<style>
+  .cat{border-collapse:separate;border-spacing:0;font-size:13px}
+  .cat th{padding:0 8px 10px;white-space:nowrap}
+  .cat td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center}
+  .cat td:first-child,.cat th:first-child{text-align:left;position:sticky;left:0;
+    background:var(--surface);z-index:1;min-width:150px}
+  .cell{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);
+    background:var(--surface-2);cursor:pointer;padding:0;display:inline-block}
+  .cell.on{background:var(--accent);border-color:var(--accent)}
+  .cell.used{box-shadow:inset 0 0 0 2px var(--surface)}
+  .off{opacity:.45}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Katalog</h1></div>
+  <div class="row" id="erpUser"></div>
+</div>
+
+<div class="card">
+  <p class="muted">Mahsulot nomlari va guruhlari shu yerda yuritiladi — kodga
+  tegilmaydi. Yangi fason chiqsa yoki guruh boshqacha atalsa, shu sahifadan
+  o'zgartiriladi va jurnalda darrov ko'rinadi.</p>
+  <p class="muted" style="margin-top:8px;font-size:13px">
+    <strong>Mahsulot = nom × guruh.</strong> "Milano" mehmonxona to'plami ham,
+    stul ham bo'lishi mumkin — ular alohida mahsulot, chunki marshruti boshqa.
+    Pastdagi jadvalda katakcha bosilsa o'sha mahsulot yaratiladi.</p>
+  <p class="muted" style="margin-top:8px;font-size:13px">
+    Birligi bor mahsulot <strong>o'chirilmaydi</strong>, faqat faolsizlantiriladi —
+    aks holda jurnal tarixi buziladi. Faolsiz mahsulot yangi kiritishda
+    ro'yxatda chiqmaydi, eski yozuvlar joyida qoladi.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── GURUHLAR -->
+<div class="card" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between;margin-bottom:14px">
+    <h2 style="margin:0">Maxsulot guruhlari</h2>
+    <button onclick="groupForm()">+ Guruh</button>
+  </div>
+  <div class="scroll"><table><thead><tr>
+    <th>Nomi</th><th>Yo'nalish</th><th>Turi</th><th>Marshrut</th>
+    <th class="num">Mahsulot</th><th style="width:150px"></th>
+  </tr></thead><tbody id="tG"></tbody></table></div>
+</div>
+
+<!-- ────────────────────────────────────────────────────── MAHSULOT NOMLARI -->
+<div class="card" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between;margin-bottom:14px">
+    <h2 style="margin:0">Maxsulot nomlari</h2>
+    <button onclick="fasonForm()">+ Nom qo'shish</button>
+  </div>
+  <div class="scroll"><table><thead><tr>
+    <th>Nomi</th><th class="num">Mahsulot</th><th style="width:150px"></th>
+  </tr></thead><tbody id="tF"></tbody></table></div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────── KESISHMA -->
+<div class="card" style="margin-top:16px">
+  <h2>Qaysi nom qaysi guruhda</h2>
+  <p class="muted" style="margin:-6px 0 14px;font-size:13px">
+    Katakchani bosing — mahsulot yaratiladi yoki faolsizlantiriladi.
+    <span class="tag" style="margin-left:8px">Ichi to'la</span> = faol ·
+    <span class="tag">Ichi bo'sh</span> = yo'q yoki faolsiz</p>
+  <div class="scroll"><table class="cat" id="grid"></table></div>
+</div>
+
+<div id="modal"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let cat = null;
+
+async function boot(){ await load(); }
+
+async function load(){
+  cat = await App.api('/api/catalog');
+  drawGroups(); drawFasons(); drawGrid();
+}
+
+const canManage = () => App.can('production.manage');
+
+// ─────────────────────────────────────────────────────────────── GURUHLAR
+function drawGroups(){
+  $('tG').innerHTML = cat.groups.map(g => `
+    <tr class="${g.active ? '' : 'off'}">
+      <td><strong>${esc(g.name)}</strong></td>
+      <td class="muted">${esc(g.line_name)}</td>
+      <td>${g.is_set ? '<span class="tag">to\'plam</span>'
+                     : '<span class="tag">yakka mahsulot</span>'}</td>
+      <td class="muted">${esc(g.route_name || '—')}</td>
+      <td class="num">${g.products}</td>
+      <td class="num">${canManage() ? `
+        <button class="del" onclick="groupForm(${g.id})">O'zgartirish</button>
+        <button class="del" onclick="toggleGroup(${g.id},${!g.active})">
+          ${g.active ? 'Yashirish' : 'Qaytarish'}</button>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="muted">Guruh yo\'q</td></tr>';
+}
+
+function groupForm(id){
+  const g = id ? cat.groups.find(x => x.id === id) : null;
+  // Marshrut yo'nalishga bog'liq: stul marshruti korpus guruhiga to'g'ri kelmaydi
+  const routeOpts = (lineId) => cat.routes
+    .filter(r => !lineId || r.line_id === +lineId)
+    .map(r => `<option value="${r.id}" ${g?.route_template_id === r.id ? 'selected' : ''}>
+                 ${esc(r.name)}</option>`).join('');
+  modal(`
+    <h2>${g ? 'Guruhni o\'zgartirish' : 'Yangi guruh'}</h2>
+    <div class="stack" style="margin-top:16px">
+      <div><label>Guruh nomi</label>
+        <input id="gName" value="${esc(g?.name || '')}" placeholder="Kamod"></div>
+      <div><label>Yo'nalish</label>
+        <select id="gLine" onchange="reRoutes()">
+          ${cat.lines.map(l => `<option value="${l.id}"
+            ${g?.line_id === l.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+        </select></div>
+      <div><label>Turi</label>
+        <select id="gSet">
+          <option value="0" ${g && !g.is_set ? 'selected' : ''}>Yakka mahsulot</option>
+          <option value="1" ${g?.is_set ? 'selected' : ''}>To'plam</option>
+        </select></div>
+      <div><label>Odatdagi marshrut</label>
+        <select id="gRoute">${routeOpts(g?.line_id)}</select>
+        <p class="muted" style="font-size:12px;margin-top:6px">Bu guruhda yaratilgan
+          mahsulotlar shu marshrut bilan boshlanadi.</p></div>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:20px">
+      <button onclick="closeModal()">Bekor</button>
+      <button class="primary" onclick="saveGroup(${id || 0})">Saqlash</button>
+    </div>`);
+}
+
+function reRoutes(){
+  const lineId = +$('gLine').value;
+  $('gRoute').innerHTML = cat.routes.filter(r => r.line_id === lineId)
+    .map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
+}
+
+async function saveGroup(id){
+  const body = {
+    name: $('gName').value,
+    line_id: +$('gLine').value,
+    is_set: $('gSet').value === '1',
+    route_template_id: +$('gRoute').value || null,
+  };
+  try{
+    if (id) await App.api('/api/catalog/groups/' + id, { method:'PATCH', body: JSON.stringify(body) });
+    else    await App.api('/api/catalog/groups',       { method:'POST',  body: JSON.stringify(body) });
+    closeModal(); await load();
+  }catch(e){ alert(e.message); }
+}
+
+async function toggleGroup(id, active){
+  try{
+    await App.api('/api/catalog/groups/' + id,
+      { method:'PATCH', body: JSON.stringify({ active }) });
+    await load();
+  }catch(e){ alert(e.message); }
+}
+
+// ────────────────────────────────────────────────────────── MAHSULOT NOMI
+function drawFasons(){
+  $('tF').innerHTML = cat.fasons.map(f => `
+    <tr class="${f.active ? '' : 'off'}">
+      <td><strong>${esc(f.name)}</strong></td>
+      <td class="num">${f.products}</td>
+      <td class="num">${canManage() ? `
+        <button class="del" onclick="renameFason(${f.id})">Nomini o'zgartirish</button>
+        <button class="del" onclick="toggleFason(${f.id},${!f.active})">
+          ${f.active ? 'Yashirish' : 'Qaytarish'}</button>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="muted">Nom yo\'q</td></tr>';
+}
+
+function fasonForm(){
+  modal(`
+    <h2>Mahsulot nomlari</h2>
+    <p class="muted" style="margin:8px 0 16px">Har qatorga bittadan yozing —
+      ro'yxatni birdan joylashtirsangiz ham bo'ladi. Mavjud nomlar takrorlanmaydi.</p>
+    <textarea id="fNames" rows="10" placeholder="Milano&#10;Onix&#10;Monaco&#10;Orex"
+      style="font:inherit;color:var(--text);background:var(--surface-2);
+             border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+             width:100%;resize:vertical"></textarea>
+    <div class="row" style="justify-content:flex-end;margin-top:20px">
+      <button onclick="closeModal()">Bekor</button>
+      <button class="primary" onclick="saveFasons()">Saqlash</button>
+    </div>`);
+  $('fNames').focus();
+}
+
+async function saveFasons(){
+  try{
+    const r = await App.api('/api/catalog/fasons',
+      { method:'POST', body: JSON.stringify({ names: $('fNames').value }) });
+    closeModal(); await load();
+    if (r.skipped?.length) alert('Allaqachon bor edi: ' + r.skipped.join(', '));
+  }catch(e){ alert(e.message); }
+}
+
+async function renameFason(id){
+  const f = cat.fasons.find(x => x.id === id);
+  const name = prompt('Yangi nom:', f.name);
+  if (!name || name === f.name) return;
+  try{
+    await App.api('/api/catalog/fasons/' + id,
+      { method:'PATCH', body: JSON.stringify({ name }) });
+    await load();
+  }catch(e){ alert(e.message); }
+}
+
+async function toggleFason(id, active){
+  try{
+    await App.api('/api/catalog/fasons/' + id,
+      { method:'PATCH', body: JSON.stringify({ active }) });
+    await load();
+  }catch(e){ alert(e.message); }
+}
+
+// ──────────────────────────────────────────────────────────────── KESISHMA
+function drawGrid(){
+  const groups = cat.groups.filter(g => g.active);
+  const fasons = cat.fasons.filter(f => f.active);
+  if (!groups.length || !fasons.length){
+    $('grid').innerHTML = `<tr><td class="muted" style="padding:16px">
+      Avval kamida bitta guruh va bitta mahsulot nomi kiriting.</td></tr>`;
+    return;
+  }
+  const key = (f, g) => cat.products.find(p => p.fason_id === f && p.group_id === g);
+  $('grid').innerHTML = `
+    <thead><tr><th>Nom</th>
+      ${groups.map(g => `<th>${esc(g.name)}</th>`).join('')}</tr></thead>
+    <tbody>${fasons.map(f => `
+      <tr><td>${esc(f.name)}</td>
+        ${groups.map(g => {
+          const p = key(f.id, g.id);
+          const on = p && p.active;
+          return `<td><button class="cell ${on ? 'on' : ''} ${p?.units > 0 ? 'used' : ''}"
+            title="${p ? esc(p.sku) + (p.units ? ` · ${p.units} birlik` : '') : 'yaratilmagan'}"
+            ${canManage() ? `onclick="toggleCell(${f.id},${g.id},${p ? p.id : 0},${on ? 1 : 0})"`
+                          : 'disabled'}></button></td>`;
+        }).join('')}
+      </tr>`).join('')}</tbody>`;
+}
+
+async function toggleCell(fasonId, groupId, productId, on){
+  try{
+    if (!productId){
+      await App.api('/api/catalog/products',
+        { method:'POST', body: JSON.stringify({ fason_id: fasonId, group_id: groupId }) });
+    } else {
+      await App.api('/api/catalog/products/' + productId,
+        { method:'PATCH', body: JSON.stringify({ active: !on }) });
+    }
+    await load();
+  }catch(e){ alert(e.message); }
+}
+
+// ───────────────────────────────────────────────────────────────── MODAL
+function modal(html){
+  $('modal').innerHTML =
+    `<div class="overlay" onclick="if(event.target===this)closeModal()">
+       <div class="modal" style="max-width:520px">${html}</div></div>`;
+}
+const closeModal = () => { $('modal').innerHTML = ''; };
+
+App.start(boot, 'production.view', 'production.manage');
+</script>
+</body>
+</html>

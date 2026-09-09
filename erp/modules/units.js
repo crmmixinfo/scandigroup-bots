@@ -18,6 +18,13 @@ const router = express.Router();
 const UNITS    = ['production.units', 'production.manage'];
 const COMMERCE = ['production.units', 'sales.manage', 'production.manage'];
 
+// Rang va mato erkin matn. Bo'sh satr NULL bo'lib yozilsin — aks holda
+// taklif ro'yxatida bo'sh qator paydo bo'ladi.
+const trim = (v) => {
+  const s = String(v ?? '').trim();
+  return s || null;
+};
+
 // ───────────────────────────────────────────────────────────────── MIJOZLAR
 router.get('/customers', need('production.view', 'sales.view'), wrap(async (_req, res) => {
   const [customers, channels, managers] = await Promise.all([
@@ -141,6 +148,24 @@ async function nextConveyorNo(client = db) {
   return prefix + String(rows[0].n).padStart(4, '0');
 }
 
+// Rang va mato uchun oldindan spravochnik tuzilmaydi — kiritilganlari
+// o'zi yig'iladi va keyingi kiritishda tanlash uchun taklif qilinadi.
+// Shunday qilib zavod o'z ranglarini ishlab ketaveradi, ro'yxatni oldindan
+// tuzib chiqish kerak bo'lmaydi.
+router.get('/suggest', need('production.view'), wrap(async (_req, res) => {
+  const { rows } = await db.query(
+    `SELECT 'color' AS field, color AS value, COUNT(*) AS n
+       FROM production_units WHERE color IS NOT NULL GROUP BY color
+     UNION ALL
+     SELECT 'fabric', fabric, COUNT(*)
+       FROM production_units WHERE fabric IS NOT NULL GROUP BY fabric
+     ORDER BY n DESC, value`);
+  res.json({
+    colors:  rows.filter((r) => r.field === 'color').map((r) => r.value),
+    fabrics: rows.filter((r) => r.field === 'fabric').map((r) => r.value),
+  });
+}));
+
 router.get('/next-no', need(...UNITS), wrap(async (_req, res) => {
   res.json({ conveyor_no: await nextConveyorNo() });
 }));
@@ -188,23 +213,41 @@ router.post('/', need(...UNITS), wrap(async (req, res) => {
           `${it.conveyor_no}: tanlangan bo'lim bu mahsulot marshrutida yo'q`);
       }
 
-      const isExit = it.section_id ? (await client.query(
-        `SELECT is_exit FROM sections WHERE id = $1`, [it.section_id])).rows[0]?.is_exit : false;
+      const place = it.section_id ? (await client.query(
+        `SELECT s.is_exit, sh.milestone
+           FROM sections s JOIN shops sh ON sh.id = s.shop_id
+          WHERE s.id = $1`, [it.section_id])).rows[0] : null;
+      const isExit = place?.is_exit || false;
+
+      // Birlik allaqachon lak yoki qadoqlash tsexida turgan bo'lsa, o'sha
+      // tsexga kirish sanasi ma'lum: kiritilmagan bo'lsa bo'limga kirgan
+      // sanadan olinadi. Boshlang'ich qoldiqda buni qo'lda takrorlash
+      // shart bo'lmaydi.
+      const enteredOn = it.entered_section_on || it.started_on || null;
+      const lakOn  = it.lak_on  || (place?.milestone === 'lak'  ? enteredOn : null);
+      const packOn = it.pack_on || (place?.milestone === 'pack' ? enteredOn : null);
 
       const u = (await client.query(
         `INSERT INTO production_units
            (conveyor_no, order_no, product_id, qty, started_on, current_section_id,
             entered_section_on, customer_id, unit_price, ship_on, next_shop_planned_on,
-            status, is_opening, note, created_by)
+            status, is_opening, note, created_by,
+            color, fabric, lak_planned_on, lak_on, pack_planned_on, pack_on,
+            fg_planned_on)
          VALUES ($1,$2,$3,$4, COALESCE($5::date, CURRENT_DATE), $6,
                  COALESCE($7::date, CURRENT_DATE), $8,$9,$10,$11,
-                 $12, $13, $14, $15)
+                 $12, $13, $14, $15,
+                 $16,$17,$18,$19,$20,$21,$22)
          RETURNING id, conveyor_no`,
         [String(it.conveyor_no).trim(), it.order_no || null, it.product_id,
          Number(it.qty) || 1, it.started_on || null, it.section_id || null,
          it.entered_section_on || null, it.customer_id || null,
          it.unit_price || null, it.ship_on || null, it.next_shop_planned_on || null,
-         isExit ? 'fg' : 'production', !!it.is_opening, it.note || null, req.user.id])).rows[0];
+         isExit ? 'fg' : 'production', !!it.is_opening, it.note || null, req.user.id,
+         trim(it.color), trim(it.fabric),
+         it.lak_planned_on || null, lakOn,
+         it.pack_planned_on || null, packOn,
+         it.fg_planned_on || null])).rows[0];
 
       if (it.section_id) {
         await client.query(
@@ -219,10 +262,12 @@ router.post('/', need(...UNITS), wrap(async (req, res) => {
         const shiftId = await resolveShift(client, it.product_id, 1, req.user.id,
                                            it.entered_section_on || null);
         await client.query(
-          `INSERT INTO flow_log (shift_id, section_id, product_id, qty_ok, worker_id, note)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
+          `INSERT INTO flow_log (shift_id, section_id, product_id, qty_ok, worker_id,
+                                 note, is_opening)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [shiftId, it.section_id, it.product_id, Number(it.qty) || 1, req.user.id,
-           u.conveyor_no + (it.is_opening ? ' · boshlang\'ich qoldiq' : '')]);
+           u.conveyor_no + (it.is_opening ? ' · boshlang\'ich qoldiq' : ''),
+           !!it.is_opening]);
       }
       if (isExit) {
         await client.query(
@@ -250,9 +295,12 @@ router.post('/', need(...UNITS), wrap(async (req, res) => {
   }
 }));
 
-// Zakaz raqami, mijoz, narx, chiqish sanasi — savdo qo'yadi
+// Zakaz raqami, mijoz, narx, chiqish sanasi — savdo qo'yadi.
+// Rang va matoni ishlab chiqarish qo'yadi, lak/qadoqlash rejasini esa
+// tsex boshlig'i — hammasi bitta jurnal qatorida turadi.
 router.patch('/:id', need(...COMMERCE), wrap(async (req, res) => {
-  const { order_no, customer_id, unit_price, ship_on, next_shop_planned_on, note, status } = req.body;
+  const { order_no, customer_id, unit_price, ship_on, next_shop_planned_on, note, status,
+          color, fabric, lak_planned_on, pack_planned_on, lak_on, pack_on } = req.body;
   const { rows } = await db.query(
     `UPDATE production_units SET
        order_no             = COALESCE($2, order_no),
@@ -261,11 +309,20 @@ router.patch('/:id', need(...COMMERCE), wrap(async (req, res) => {
        ship_on              = COALESCE($5::date, ship_on),
        next_shop_planned_on = COALESCE($6::date, next_shop_planned_on),
        note                 = COALESCE($7, note),
-       status               = COALESCE($8, status)
+       status               = COALESCE($8, status),
+       color                = COALESCE($9,  color),
+       fabric               = COALESCE($10, fabric),
+       lak_planned_on       = COALESCE($11::date, lak_planned_on),
+       pack_planned_on      = COALESCE($12::date, pack_planned_on),
+       lak_on               = COALESCE($13::date, lak_on),
+       pack_on              = COALESCE($14::date, pack_on),
+       fg_planned_on        = COALESCE($15::date, fg_planned_on)
      WHERE id = $1 RETURNING id`,
     [req.params.id, order_no || null, customer_id || null,
      unit_price === '' || unit_price == null ? null : Number(unit_price),
-     ship_on || null, next_shop_planned_on || null, note || null, status || null]);
+     ship_on || null, next_shop_planned_on || null, note || null, status || null,
+     trim(color), trim(fabric), lak_planned_on || null, pack_planned_on || null,
+     lak_on || null, pack_on || null, req.body.fg_planned_on || null]);
   if (!rows[0]) return res.status(404).json({ error: 'Birlik topilmadi' });
   await audit(req, { module: 'production', action: 'update', entity: 'unit',
                      entity_id: req.params.id, payload: req.body });
@@ -296,7 +353,9 @@ async function moveOne(client, req, { unit_id, section_id, moved_on, qty_defect,
   }
 
   const sec = (await client.query(
-    `SELECT is_exit FROM sections WHERE id = $1`, [target])).rows[0];
+    `SELECT s.is_exit, sh.milestone
+       FROM sections s JOIN shops sh ON sh.id = s.shop_id
+      WHERE s.id = $1`, [target])).rows[0];
   const defect = Number(qty_defect) || 0;
   if (defect > 0 && !defect_reason) throw new Error('Brak uchun sabab kodi majburiy');
 
@@ -313,6 +372,18 @@ async function moveOne(client, req, { unit_id, section_id, moved_on, qty_defect,
        status = CASE WHEN $4 THEN 'fg' ELSE status END,
        fg_on  = CASE WHEN $4 THEN COALESCE($3::date, CURRENT_DATE) ELSE fg_on END
      WHERE id = $1`, [unit_id, target, moved_on || null, sec.is_exit]);
+
+  // Lak va Qadoqlash tsexiga kirish sanasi jurnalda alohida ustun. Reja
+  // sanasini tsex boshlig'i qo'yadi, faktni esa birlik o'sha tsexga
+  // o'tganda tizim o'zi yozadi — qo'lda ikkinchi marta kiritilmaydi.
+  // Stul oqimi bo'yoqlashdan keyin qaytadi, shuning uchun BIRINCHI kirish
+  // sanasi saqlanadi: ustun bo'sh bo'lgandagina yoziladi.
+  if (sec.milestone) {
+    const col = sec.milestone === 'lak' ? 'lak_on' : 'pack_on';
+    await client.query(
+      `UPDATE production_units SET ${col} = COALESCE($2::date, CURRENT_DATE)
+        WHERE id = $1 AND ${col} IS NULL`, [unit_id, moved_on || null]);
+  }
 
   // Umumiy hisobotlar (WIP, panel, Pareto) o'zgarishsiz ishlashi uchun
   // har o'tkazish jamlanma flow_log ga ham yoziladi.

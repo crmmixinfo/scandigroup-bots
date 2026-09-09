@@ -79,7 +79,7 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const n = v => Number(v ?? 0).toLocaleString('uz-UZ');
+const n = v => String(Math.round(Number(v) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 $('date').value = new Date().toISOString().slice(0, 10);
 
 const pctTag = p => `<span class="tag ${p >= 95 ? 'ok' : p >= 80 ? 'warn' : 'bad'}">${p ?? 0}%</span>`;

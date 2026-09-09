@@ -20,25 +20,25 @@
   <div class="card">
     <h2>Kanal kesimi</h2>
     <table><thead><tr><th>Kanal</th><th class="num">Mijoz</th>
-      <th class="num">Dona</th><th class="num">Summa</th></tr></thead>
+      <th class="num">Dona</th><th class="num">Summa, $</th></tr></thead>
       <tbody id="tCh"></tbody></table>
   </div>
   <div class="card">
     <h2>Respublika kesimi</h2>
     <table><thead><tr><th>Respublika</th><th class="num">Mijoz</th>
-      <th class="num">Dona</th><th class="num">Summa</th></tr></thead>
+      <th class="num">Dona</th><th class="num">Summa, $</th></tr></thead>
       <tbody id="tCo"></tbody></table>
   </div>
   <div class="card">
     <h2>Region kesimi</h2>
     <table><thead><tr><th>Respublika</th><th>Region</th><th class="num">Mijoz</th>
-      <th class="num">Dona</th><th class="num">Summa</th></tr></thead>
+      <th class="num">Dona</th><th class="num">Summa, $</th></tr></thead>
       <tbody id="tRg"></tbody></table>
   </div>
   <div class="card">
     <h2>Savdo menejeri kesimi</h2>
     <table><thead><tr><th>Menejer</th><th class="num">Mijoz</th>
-      <th class="num">Zakaz</th><th class="num">Summa</th></tr></thead>
+      <th class="num">Zakaz</th><th class="num">Summa, $</th></tr></thead>
       <tbody id="tMg"></tbody></table>
   </div>
 </div>
@@ -50,7 +50,7 @@
   </div>
   <div style="overflow-x:auto"><table>
     <thead><tr><th>Mijoz nomi</th><th>Respublika</th><th>Region</th><th>Tel raqami</th><th>Kanali</th>
-      <th class="num">Zakaz</th><th class="num">Dona</th><th class="num">Summa</th><th></th></tr></thead>
+      <th class="num">Zakaz</th><th class="num">Dona</th><th class="num">Summa, $</th><th></th></tr></thead>
     <tbody id="tB"></tbody>
   </table></div>
 </div>
@@ -61,7 +61,12 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money = v => Number(v || 0).toLocaleString('uz-UZ');
+const money = (v) => {
+  const x = Number(v) || 0;
+  const [i, f] = (Math.abs(x) < 1e15 ? x.toFixed(2) : String(x)).split('.');
+  const grouped = i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return f && f !== '00' ? `${grouped}.${f}` : grouped;
+};
 // Respublika → region ro'yxati. Region matn maydoni, ro'yxat faqat taklif —
 // yangi shahar qo'shish uchun kod o'zgartirish shart emas.
 const GEO = {

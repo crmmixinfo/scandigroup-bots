@@ -14,6 +14,8 @@ const FILES = [
   'production-seed.sql', // tsexlar, bo'limlar, marshrutlar
   'production-sku.sql',  // fason va SKU katalogi
   'units.sql',           // konveyer jurnali: birlik, mijoz, harakat
+  'register.sql',        // jurnal ustunlari: rang, mato, lak/qadoqlash sanalari
+  'catalog.sql',         // katalogni saytdan boshqarish: guruh, fason, SKU
 ];
 
 // server.js ham shu funksiyani chaqiradi (ERP_AUTO_MIGRATE=1 bo'lsa),

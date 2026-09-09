@@ -5,6 +5,7 @@
 <title>Boshlang'ich qoldiq · Scandi</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230c0d0f%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23c9a227%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="/app.js"></script>
 </head>
 <body>
@@ -18,10 +19,13 @@
   <p class="muted">Tizim ishga tushirilgan kunda konveyerda turgan va T/M omborida
   yotgan mahsulotlarni kiriting. Har qator — bitta konveyer raqami.</p>
   <p class="muted" style="margin-top:8px;font-size:13px">
-    <strong>Bo'lim tanlanmagan qator saqlanmaydi</strong> — bo'sh qatorni
-    o'chirish shart emas. Chiqish bo'limi (Qadoqlash) tanlansa birlik darrov
-    T/M omboriga tushadi. Zakaz va mijoz keyin ham
-    qo'yilishi mumkin — jurnal sahifasidan.</p>
+    <strong>Bo'lim tanlanmagan qator saqlanmaydi</strong> — bo'sh qatorni o'chirish
+    shart emas. Qadoqlash bo'limi tanlansa birlik darrov T/M omboriga tushadi.
+    Zakaz, mijoz va narx keyin ham qo'yilishi mumkin — jurnal sahifasidan.</p>
+  <p class="muted" style="margin-top:8px;font-size:13px">
+    <strong>Lak va Qadoqlash sanalari</strong> — reja: qaysi kunga topshirish
+    kelishilgan. Birlik o'sha tsexga o'tganda tizim faktni o'zi yozadi.
+    Mahsulot allaqachon o'sha tsexda bo'lsa, sanani kiritish shart emas.</p>
 </div>
 
 <div class="card" style="margin-top:16px">
@@ -30,22 +34,32 @@
     <div class="row">
       <button onclick="addRow()">+ Qator</button>
       <button onclick="addRow(5)">+ 5 qator</button>
+      <button onclick="addRow(20)">+ 20 qator</button>
     </div>
   </div>
-  <div style="overflow-x:auto">
-    <table><thead><tr>
-      <th style="min-width:150px">Konveyer №</th>
-      <th style="min-width:200px">Mahsulot</th>
-      <th class="num" style="width:90px">Soni</th>
-      <th style="min-width:160px">Tsex</th>
-      <th style="min-width:180px">Bo'lim</th>
-      <th style="width:150px">Kirgan sana</th>
-      <th style="min-width:140px">Zakaz №</th>
-      <th style="min-width:170px">Mijoz</th>
-      <th class="num" style="width:130px">Narx</th>
-      <th style="width:40px"></th>
+  <div class="scroll">
+    <table class="sheet"><thead><tr>
+      <th style="min-width:135px">Bosh sana</th>
+      <th class="fix" style="min-width:120px">K&#8470;</th>
+      <th style="min-width:110px">Z&#8470;</th>
+      <th style="min-width:145px">Maxsulot nomi</th>
+      <th style="min-width:165px">Maxsulot guruhi</th>
+      <th style="min-width:120px">Rang</th>
+      <th style="min-width:120px">Mato</th>
+      <th class="num" style="width:80px">Soni</th>
+      <th style="min-width:150px">Tseh</th>
+      <th style="min-width:160px">Bo'lim</th>
+      <th style="min-width:135px">Lak tsehi</th>
+      <th style="min-width:135px">Qadoqlash tsehi</th>
+      <th style="min-width:135px">T/M ombor</th>
+      <th style="min-width:170px">Mijoz nomi</th>
+      <th class="num" style="min-width:130px">Narx, $</th>
+      <th class="num" style="min-width:140px">Summa, $</th>
+      <th style="width:36px"></th>
     </tr></thead><tbody id="tB"></tbody></table>
   </div>
+  <datalist id="dlColor"></datalist>
+  <datalist id="dlFabric"></datalist>
 </div>
 
 <div class="card hide" id="saveBar" style="position:sticky;bottom:16px;margin-top:16px;
@@ -61,49 +75,97 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let ref = null, customers = [], seq = 0, nextNo = null;
+const nf = (v) => {
+  const x = Number(v) || 0;
+  const [i, f] = (Math.abs(x) < 1e15 ? x.toFixed(2) : String(x)).split('.');
+  const grouped = i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return f && f !== '00' ? `${grouped}.${f}` : grouped;
+};
+const money = n => n ? nf(n) : '';
+
+let ref = null, customers = [], seq = 0, nextNo = null, suggest = { colors: [], fabrics: [] };
+
+// Fason → qaysi guruhlarda mavjud. Jadvalda mahsulot nomi va guruhi alohida
+// ustun — qog'oz jurnalda ham shunday. Ikkovi birga SKU ni beradi.
+let byFason = new Map();
 
 async function boot(){
-  const [r, c, nn] = await Promise.all([
-    App.api('/api/ref'), App.api('/api/units/customers'), App.api('/api/units/next-no')]);
-  ref = r; customers = c.customers; nextNo = nn;
-  addRow(3);
+  const [r, c, nn, sg] = await Promise.all([
+    App.api('/api/ref'), App.api('/api/units/customers'),
+    App.api('/api/units/next-no'), App.api('/api/units/suggest')]);
+  ref = r; customers = c.customers; nextNo = nn; suggest = sg;
+
+  for (const p of ref.products.filter(p => p.route_template_id)){
+    if (!byFason.has(p.name)) byFason.set(p.name, []);
+    byFason.get(p.name).push(p);
+  }
+  fillSuggest();
+  if (!byFason.size){
+    $('tB').innerHTML = `<tr><td colspan="17" style="padding:24px">
+      <strong>Katalog bo'sh.</strong>
+      <p class="muted" style="margin-top:6px">Avval mahsulot nomlari va guruhlarini
+      kiriting — <a href="/katalog.html" style="color:var(--accent)">Katalog sahifasi</a>.</p>
+      </td></tr>`;
+    return;
+  }
+  addRow(5);
 }
 
-// Marshrutga mos bo'limlar: mahsulot tanlangach tsex/bo'lim ro'yxati toraydi
-function sectionsOfShop(shopId){
-  return ref.sections.filter(s => s.shop_id === +shopId);
+function fillSuggest(){
+  $('dlColor').innerHTML  = suggest.colors.map(v => `<option value="${esc(v)}">`).join('');
+  $('dlFabric').innerHTML = suggest.fabrics.map(v => `<option value="${esc(v)}">`).join('');
 }
+
+const sectionsOfShop = shopId => ref.sections.filter(s => s.shop_id === +shopId);
 
 function addRow(k = 1){
   const start = (nextNo.conveyor_no.match(/(\d+)$/) || [0, 0])[1] | 0;
   const prefix = nextNo.conveyor_no.replace(/\d+$/, '');
+  const today = new Date().toISOString().slice(0, 10);
+  const fasons = [...byFason.keys()];
+
   for (let i = 0; i < k; i++){
     const n = prefix + String(start + seq).padStart(4, '0');
     seq++;
     $('tB').insertAdjacentHTML('beforeend', `
       <tr>
-        <td><input class="c-no" value="${n}"></td>
-        <td><select class="c-prod">
-          ${ref.products.filter(p => p.route_template_id).map(p =>
-            `<option value="${p.id}">${esc(p.name)} · ${esc(p.group_name)}</option>`).join('')}
+        <td><input class="c-start" type="date" value="${today}"></td>
+        <td class="fix"><input class="c-no" value="${n}"></td>
+        <td><input class="c-order" placeholder="—"></td>
+        <td><select class="c-fason" onchange="fillGroup(this)">
+          ${fasons.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')}
         </select></td>
+        <td><select class="c-group"></select></td>
+        <td><input class="c-color" list="dlColor" placeholder="—"></td>
+        <td><input class="c-fabric" list="dlFabric" placeholder="—"></td>
         <td><input class="c-qty" type="number" min="1" value="1" oninput="sum()"></td>
         <td><select class="c-shop" onchange="fillSec(this)">
           <option value="">— boshlanmagan —</option>
           ${ref.shops.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
         </select></td>
-        <td><select class="c-sec"><option value="">—</option></select></td>
-        <td><input class="c-date" type="date" value="${new Date().toISOString().slice(0,10)}"></td>
-        <td><input class="c-order" placeholder="—"></td>
+        <td><select class="c-sec" onchange="sum()"><option value="">—</option></select></td>
+        <td><input class="c-lak" type="date"></td>
+        <td><input class="c-pack" type="date"></td>
+        <td><input class="c-fg" type="date"></td>
         <td><select class="c-cust"><option value="">T/M ombor</option>
           ${customers.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
         </select></td>
         <td><input class="c-price" type="number" min="0" placeholder="—" oninput="sum()"></td>
-        <td class="num"><button onclick="this.closest('tr').remove();sum()">×</button></td>
+        <td class="num"><input class="c-amount" readonly tabindex="-1"></td>
+        <td class="num"><button class="del" onclick="this.closest('tr').remove();sum()">&times;</button></td>
       </tr>`);
+    fillGroup($('tB').lastElementChild.querySelector('.c-fason'));
   }
   sum();
+}
+
+// Fason tanlangach guruh ro'yxati shu fason mavjud bo'lgan guruhlarga toradi:
+// "Monaco" stul bo'lmasa, ro'yxatda stul chiqmaydi.
+function fillGroup(sel){
+  const tr = sel.closest('tr');
+  const list = byFason.get(sel.value) || [];
+  tr.querySelector('.c-group').innerHTML =
+    list.map(p => `<option value="${p.id}">${esc(p.group_name)}</option>`).join('');
 }
 
 function fillSec(sel){
@@ -112,29 +174,49 @@ function fillSec(sel){
   sec.innerHTML = sel.value
     ? sectionsOfShop(sel.value).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')
     : '<option value="">—</option>';
+  sum();
 }
 
 function collect(){
-  return [...document.querySelectorAll('#tB tr')].map(tr => ({
-    conveyor_no: tr.querySelector('.c-no').value.trim(),
-    product_id:  +tr.querySelector('.c-prod').value,
-    qty:         +tr.querySelector('.c-qty').value || 1,
-    section_id:  tr.querySelector('.c-sec').value || null,
-    started_on:  tr.querySelector('.c-date').value || null,
-    entered_section_on: tr.querySelector('.c-date').value || null,
-    order_no:    tr.querySelector('.c-order').value.trim() || null,
-    customer_id: tr.querySelector('.c-cust').value || null,
-    unit_price:  tr.querySelector('.c-price').value === '' ? null
-                 : +tr.querySelector('.c-price').value,
-    is_opening:  true,
-  }))
+  return [...document.querySelectorAll('#tB tr')].map(tr => {
+    const g = (v) => tr.querySelector(v)?.value ?? '';
+    const qty = +g('.c-qty') || 1;
+    const price = g('.c-price') === '' ? null : +g('.c-price');
+    return {
+      conveyor_no: g('.c-no').trim(),
+      product_id:  +g('.c-group'),
+      qty, unit_price: price,
+      order_no:    g('.c-order').trim() || null,
+      color:       g('.c-color').trim() || null,
+      fabric:      g('.c-fabric').trim() || null,
+      section_id:  g('.c-sec') || null,
+      started_on:  g('.c-start') || null,
+      entered_section_on: g('.c-start') || null,
+      // Sanalar reja sifatida yoziladi; birlik o'sha tsexga o'tganda
+      // tizim faktni o'zi qo'yadi va reja bilan solishtiriladi.
+      lak_planned_on:  g('.c-lak')  || null,
+      pack_planned_on: g('.c-pack') || null,
+      fg_planned_on:   g('.c-fg')   || null,
+      customer_id: g('.c-cust') || null,
+      customer_id_raw: g('.c-cust'),
+      is_opening:  true,
+      _tr: tr,
+    };
+  })
   // Faqat bo'lim tanlangan qatorlar hisobga olinadi. Konveyer raqami
-  // oldindan to'ldirilgani uchun bu bo'lmasa "+5 qator" bosgan xodim
+  // oldindan to'ldirilgani uchun bu bo'lmasa "+20 qator" bosgan xodim
   // bexosdan bo'sh birlik yaratib qo'yardi.
-  .filter(r => r.conveyor_no && r.section_id);
+  .filter(r => r.conveyor_no && r.section_id && r.product_id);
 }
 
 function sum(){
+  // Summa ustuni har qatorda o'zi hisoblanadi — qo'lda kiritilmaydi
+  for (const tr of document.querySelectorAll('#tB tr')){
+    const q = +tr.querySelector('.c-qty')?.value || 0;
+    const p = +tr.querySelector('.c-price')?.value || 0;
+    const cell = tr.querySelector('.c-amount');
+    if (cell) cell.value = q && p ? money(q * p) : '';
+  }
   const r = collect();
   const qty = r.reduce((s, x) => s + x.qty, 0);
   const amt = r.reduce((s, x) => s + (x.unit_price || 0) * x.qty, 0);
@@ -142,17 +224,17 @@ function sum(){
   const total = document.querySelectorAll('#tB tr').length;
   const skipped = total - r.length;
   $('sumText').textContent = `${r.length} birlik · ${qty} dona` +
-    (amt ? ` · ${amt.toLocaleString('uz-UZ')} so'm` : '') +
+    (amt ? ` · $${money(amt)}` : '') +
     (skipped ? ` · ${skipped} qator bo'lim tanlanmagani uchun saqlanmaydi` : '');
 }
 
 function reset_(){ $('tB').innerHTML = ''; sum(); }
 
 async function save(){
-  const items = collect();
-  if (!items.length) return;
-  const dup = items.map(i => i.conveyor_no)
-    .filter((v, i, a) => a.indexOf(v) !== i);
+  const rows = collect();
+  if (!rows.length) return;
+  const items = rows.map(({ _tr, customer_id_raw, ...it }) => it);
+  const dup = items.map(i => i.conveyor_no).filter((v, i, a) => a.indexOf(v) !== i);
   if (dup.length) return alert('Konveyer raqami takrorlanmoqda: ' + dup.join(', '));
 
   $('btnSave').disabled = true;
@@ -167,15 +249,17 @@ async function save(){
       nextNo = await App.api('/api/units/next-no');
       const start = (nextNo.conveyor_no.match(/(\d+)$/) || [0, 0])[1] | 0;
       const prefix = nextNo.conveyor_no.replace(/\d+$/, '');
-      const inputs = [...document.querySelectorAll('.c-no')];
       items.forEach((it, i) => {
         it.conveyor_no = prefix + String(start + i).padStart(4, '0');
-        if (inputs[i]) inputs[i].value = it.conveyor_no;
+        const input = rows[i]._tr.querySelector('.c-no');
+        if (input) input.value = it.conveyor_no;
       });
       r = await App.api('/api/units', { method:'POST', body: JSON.stringify({ items }) });
     }
     reset_();
-    nextNo = await App.api('/api/units/next-no');
+    [nextNo, suggest] = await Promise.all([
+      App.api('/api/units/next-no'), App.api('/api/units/suggest')]);
+    fillSuggest();
     seq = 0;
     alert(`${r.created.length} ta birlik kiritildi. Jurnal sahifasida ko'rishingiz mumkin.`);
   }catch(e){ alert(e.message); }

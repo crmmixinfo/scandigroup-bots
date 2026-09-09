@@ -208,6 +208,18 @@ CREATE TABLE IF NOT EXISTS flow_log (
   note       TEXT,
   CHECK (qty_ok >= 0 AND qty_defect >= 0)
 );
+-- Boshlang'ich qoldiq ham flow_log ga tushadi (WIP va hisobotlar shunga
+-- tayanadi), lekin u O'SHA KUNI ISHLAB CHIQARILGAN emas — konveyerda
+-- allaqachon turgan mahsulotning suratga olingani. Quvvat hisobiga qo'shilsa
+-- bo'lim quvvati bir necha barobar oshib ketadi va muddat bashorati buziladi:
+-- savdo mijozga noto'g'ri sana aytadi. Shuning uchun alohida belgilanadi.
+ALTER TABLE flow_log ADD COLUMN IF NOT EXISTS is_opening BOOLEAN NOT NULL DEFAULT false;
+
+-- Belgi qo'shilishidan oldin kiritilgan qoldiqlar: izohidan topiladi.
+-- Bir marta ishlaydi, keyin mos qator qolmaydi.
+UPDATE flow_log SET is_opening = true
+ WHERE NOT is_opening AND note LIKE '%boshlang''ich qoldiq%';
+
 CREATE INDEX IF NOT EXISTS idx_flow_shift   ON flow_log(shift_id);
 CREATE INDEX IF NOT EXISTS idx_flow_section ON flow_log(section_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_flow_ts      ON flow_log(ts);
@@ -432,6 +444,8 @@ WITH obs AS (
   FROM flow_log f
   JOIN shifts s ON s.id = f.shift_id
   WHERE s.work_date >= CURRENT_DATE - INTERVAL '14 days' AND f.qty_ok > 0
+    -- Boshlang'ich qoldiq real ishlab chiqarish emas — quvvatga qo'shilmaydi
+    AND NOT f.is_opening
   GROUP BY f.section_id
 )
 SELECT sc.id AS section_id, sc.name AS section,

@@ -83,3 +83,24 @@ tr.click:hover td{background:var(--surface-2)}
 .track .node.here::before{background:var(--accent);border-color:var(--accent)}
 .track .node:not(:last-child)::after{content:'';position:absolute;left:-18px;top:18px;
   bottom:0;width:1px;background:var(--line)}
+
+/* Jadval-kiritish (boshlang'ich qoldiq, jurnal) — qog'oz jurnalning o'zi.
+   Ustunlar ko'p, shuning uchun katakchalar zich va gorizontal siljiydi. */
+.sheet{border-collapse:separate;border-spacing:0;font-size:13px}
+.sheet th{padding:0 10px 10px;white-space:nowrap;position:sticky;top:0;
+  background:var(--surface);z-index:2}
+.sheet td{padding:4px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.sheet input,.sheet select{padding:8px 9px;border-radius:8px;font-size:13px;
+  background:transparent;border-color:transparent}
+.sheet input:hover,.sheet select:hover{border-color:var(--line)}
+.sheet input:focus,.sheet select:focus{background:var(--surface-2);border-color:var(--accent)}
+.sheet input[readonly]{color:var(--muted);pointer-events:none}
+.sheet .fix{position:sticky;left:0;background:var(--surface);z-index:1}
+.sheet tr:hover .fix{background:var(--surface-2)}
+.sheet .del{padding:6px 10px;font-size:13px;line-height:1;color:var(--muted)}
+/* Sana ustunlari uch xil manbadan keladi — qaysi ekani rang bilan ajratiladi */
+.src-fakt{color:var(--ok)}
+.src-reja{color:var(--text)}
+.src-taxmin{color:var(--muted);font-style:italic}
+.late{color:var(--bad)}
+.scroll{overflow-x:auto;overflow-y:visible}

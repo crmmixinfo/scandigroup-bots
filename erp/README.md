@@ -166,6 +166,7 @@ Operator smenani tanlamaydi — tizim uni mahsulot yo'nalishidan aniqlaydi.
 | `/terminal.html` | Tsex planshetlari: bo'lim bo'yicha real vaqtda kiritish | `production.entry` |
 | `/sozlamalar.html` | Bo'lim quvvati — muddat bashorati shunga tayanadi | `production.manage` |
 | `/xodimlar.html` | Xodim, PIN, rol va tsex biriktirish | `admin.users` |
+| `/katalog.html` | **Mahsulot nomi va guruhi** — katalog kodda emas, shu yerda | `production.manage` |
 
 ### Ishlab chiqarish jurnali — konveyer raqami
 
@@ -184,9 +185,13 @@ tushadi.
 Jurnal ustunlari gorizontal, mahsulotlar qatorlarda vertikal:
 
 ```
-Sana · Konveyer № · Zakaz № · Mahsulot · Turi · Soni · Tsex · Bo'lim ·
-Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
+Bosh sana · K№ · Z№ · Maxsulot nomi · Maxsulot guruhi · Rang · Mato ·
+Soni · Tseh · Bo'lim · Lak tsehi · Qadoqlash tsehi · T/M ombor ·
+Mijoz nomi · Narx · Summa
 ```
+
+Ustunlar zavodda yuritilgan qog'oz jurnaldan olingan — xodim yangi tartibga
+o'rganishi shart emas. Pul birligi — **dollar**.
 
 - **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K26-0001`
   shaklida avtomatik taklif qilinadi. Raqam **butun to'plamga** qo'yiladi:
@@ -199,9 +204,25 @@ Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
   jurnalda shu raqam bo'yicha filtrlanadi. Zakaz hali yo'q bo'lsa faqat
   konveyer raqami turadi.
 - **Mijoz** — biriktirilmagan bo'lsa `T/M ombor` deb ko'rsatiladi.
-- **Keyingi tsexga / T/M omborga** — qo'lda reja kiritilsa `reja`, kiritilmasa
-  marshrut va bo'lim quvvatidan `taxmin`, allaqachon kirgan bo'lsa `fakt`
-  belgisi bilan chiqadi.
+- **Rang va Mato** — birlikning o'zida, SKU da emas: bitta fason har xil
+  rangda va matoda chiqadi. Ro'yxat oldindan tuzilmaydi — kiritilgani o'zi
+  yig'iladi va keyingi safar tanlash uchun taklif qilinadi.
+- **Lak tsehi · Qadoqlash tsehi · T/M ombor** — uchalasi bir mantiqda
+  ishlaydi:
+  `fakt` — birlik o'sha tsexga o'tganda tizim o'zi yozadi;
+  `reja` — tsex boshlig'i qo'ygan muddat, topshirish shunga qarab nazorat
+  qilinadi; `taxmin` — marshrut va bo'lim quvvatidan hisoblanadi.
+  Reja o'tib ketgan bo'lsa qator `kechikdi` deb belgilanadi.
+  Qadoqlash sanasi savdo uchun: mahsulot T/M omborida bo'lmasa, mijozga
+  aytiladigan muddat aynan shundan chiqadi.
+- **Keyingi tsexga** — qo'lda reja kiritilsa `reja`, kiritilmasa marshrut va
+  bo'lim quvvatidan `taxmin`, allaqachon kirgan bo'lsa `fakt` belgisi bilan
+  chiqadi.
+
+  Yo'lda quvvati kiritilmagan bo'lim tursa **taxmin umuman ko'rsatilmaydi**.
+  Yarim ma'lumotdan chiqqan sana bo'sh katakdan yomonroq: unga ishonib mijozga
+  va'da beriladi. Bo'sh ustun "`/sozlamalar.html` da quvvatni kiriting"
+  degani.
 
 Birlik "O'tkazish" tugmasi bilan marshrutdagi **keyingi bo'limga** o'tadi —
 qaysi bo'lim ekanini tizim marshrutdan o'zi topadi. Chiqish bo'limiga
@@ -311,21 +332,27 @@ o'chirish yoki o'zgartirish** (`/xodimlar.html`).
 ## Birinchi kun tartibi
 
 1. `npm run erp:migrate` — baza tayyor bo'ladi (4 tsex, 24 bo'lim, 32 SKU).
-2. `/xodimlar.html` — xodimlarni kiriting, PIN bering, rol biriktiring.
+2. `/katalog.html` — o'z mahsulot nomlari va guruhlaringizni kiriting.
+   Ishlatmaydigan fason va guruhlarni yashiring.
+3. `/xodimlar.html` — xodimlarni kiriting, PIN bering, rol biriktiring.
    Ma'lumot kiritadigan xodimlarga **Ma'lumot kirituvchi** rolini bering:
    ular jurnal va qoldiqni to'ldiradi, lekin marshrut, bo'lim quvvati va
    xodimlarga tegmaydi. Demo xodimlarni o'chiring.
-3. `/sozlamalar.html` — har bo'limning taxminiy kunlik quvvatini kiriting.
+4. `/sozlamalar.html` — har bo'limning taxminiy kunlik quvvatini kiriting.
    Aniq bo'lmasa ham kiriting: muddat bashorati shusiz ishlamaydi, real fakt
    yig'ilgach bu qiymatlar avtomatik ustunlikni yo'qotadi.
-4. `/mijozlar.html` — mijozlar ro'yxatini import qiling.
-5. `/qoldiq.html` — bugun konveyerda turgan va T/M omborida yotgan
+5. `/mijozlar.html` — mijozlar ro'yxatini import qiling.
+6. `/qoldiq.html` — bugun konveyerda turgan va T/M omborida yotgan
    mahsulotlarni konveyer raqami bilan kiriting. Bu bir martalik ish.
-6. Kundalik ish: ishlab chiqarish boshlig'i `/jurnal.html` da birliklarni
+7. Kundalik ish: ishlab chiqarish boshlig'i `/jurnal.html` da birliklarni
    o'tkazadi, tsex boshliqlari `/smena.html` da jamlanma kiritadi.
-7. Siz `/zavod.html` va `/dashboard.html` dan kuzatasiz.
+8. Siz `/zavod.html` va `/dashboard.html` dan kuzatasiz.
 
 ## Joriy qilish tartibi
+
+**0-faza — katalog.** `/katalog.html` da o'z mahsulot nomlaringiz va
+guruhlaringizni kiriting, ishlatmaydiganlarini yashiring. Seed'dagi 17 fason va
+4 guruh — boshlang'ich taklif, majburiy emas.
 
 **1-faza — ishga tushirishdan oldin.** To'plam tarkibini kiritish (`set_items`)
 — komplektlilik hisoboti shusiz ishlamaydi. Fasonlarning real marshrutlarini

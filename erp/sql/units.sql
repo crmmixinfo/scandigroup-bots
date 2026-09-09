@@ -169,63 +169,34 @@ nxt AS (
   JOIN shops sh     ON sh.id = r.rem_shop_id
   GROUP BY b.unit_id, b.change_step, sh.name
 )
+-- Quvvati noma'lum bo'lim oldinda tursa muddat CHIQARILMAYDI. Aks holda
+-- o'sha bo'lim yig'indidan jimgina tushib qoladi va sana haqiqiydan qisqa
+-- ko'rinadi — savdo mijozga bajarib bo'lmaydigan muddat aytadi. Bo'sh
+-- javob "quvvatni kiriting" degani, noto'g'ri sanadan ko'ra foydaliroq.
 SELECT r.unit_id, n.next_shop,
-       CEIL(MAX(r.qty / NULLIF(r.rate_per_day, 0))
+       CASE WHEN COUNT(*) FILTER (WHERE r.rate_per_day IS NULL
+              AND (n.change_step IS NULL OR r.rem_step < n.change_step)) > 0 THEN NULL
+            ELSE CEIL(MAX(r.qty / NULLIF(r.rate_per_day, 0))
               FILTER (WHERE n.change_step IS NULL OR r.rem_step < n.change_step)
             + SUM(1.0 / NULLIF(r.rate_per_day, 0))
               FILTER (WHERE n.change_step IS NULL OR r.rem_step < n.change_step))
-         AS next_shop_days,
-       CEIL(MAX(r.qty / NULLIF(r.rate_per_day, 0))
-            + SUM(1.0 / NULLIF(r.rate_per_day, 0))) AS fg_days
+       END AS next_shop_days,
+       CASE WHEN COUNT(*) FILTER (WHERE r.rate_per_day IS NULL) > 0 THEN NULL
+            ELSE CEIL(MAX(r.qty / NULLIF(r.rate_per_day, 0))
+                    + SUM(1.0 / NULLIF(r.rate_per_day, 0)))
+       END AS fg_days
 FROM v_unit_rem r
 LEFT JOIN nxt n ON n.unit_id = r.unit_id
 GROUP BY r.unit_id, n.next_shop, n.change_step;
 
--- ★ ISHLAB CHIQARISH BOSHLIG'INING JADVALI
---   Sana · Konveyer · Zakaz · Mahsulot · Turi · Soni · Tsex · Bo'lim ·
---   Keyingi tsexga o'tkazish · T/M omboriga kirish · Mijoz · Narx · Summa ·
---   Mijozga chiqish
-CREATE OR REPLACE VIEW v_unit_register AS
-SELECT
-  u.id,
-  u.started_on,                                   -- ishlab chiqarishga kirgan sana
-  u.conveyor_no,
-  u.order_no,
-  p.name  AS product,
-  p.sku,
-  g.name  AS product_type,                        -- mahsulot turi (guruh)
-  u.qty,
-  pp.shop, pp.shop_id, pp.section, pp.section_id, pp.step_no,
-  u.entered_section_on,
-
-  -- Keyingi tsexga o'tkazish sanasi: qo'lda reja bo'lsa u, aks holda taxmin
-  COALESCE(u.next_shop_planned_on,
-           CURRENT_DATE + (e.next_shop_days || ' days')::interval)::date AS next_shop_on,
-  CASE WHEN u.next_shop_planned_on IS NOT NULL THEN 'reja'
-       WHEN e.next_shop_days IS NOT NULL       THEN 'taxmin'
-       ELSE NULL END AS next_shop_src,
-  e.next_shop AS next_shop,
-
-  -- T/M omboriga kirish: kirgan bo'lsa fakt, aks holda taxmin
-  COALESCE(u.fg_on, (CURRENT_DATE + (e.fg_days || ' days')::interval)::date) AS fg_on,
-  CASE WHEN u.fg_on IS NOT NULL      THEN 'fakt'
-       WHEN e.fg_days IS NOT NULL    THEN 'taxmin'
-       ELSE NULL END AS fg_src,
-
-  COALESCE(c.name, 'T/M ombor') AS customer_name,  -- mijoz yo'q bo'lsa T/M ombor
-  u.customer_id,
-  u.unit_price,
-  u.total_amount,
-  u.ship_on,
-  u.status,
-  u.is_opening,
-  u.note
-FROM production_units u
-JOIN products p        ON p.id = u.product_id
-JOIN product_groups g  ON g.id = p.group_id
-LEFT JOIN v_unit_place pp ON pp.unit_id = u.id
-LEFT JOIN v_unit_eta e    ON e.unit_id = u.id
-LEFT JOIN customers c     ON c.id = u.customer_id;
+-- ★ ISHLAB CHIQARISH BOSHLIG'INING JADVALI — register.sql da
+--
+--   v_unit_register shu yerda EMAS, register.sql da yaratiladi. Sabab:
+--   migratsiya har deploy'da qayta ishlaydi va fayllar tartib bilan yuradi.
+--   View ikki faylda tursa, oldingi fayl uni eski ustunlar bilan qayta
+--   yozmoqchi bo'ladi va "cannot drop columns from view" xatosi chiqadi —
+--   ERP_AUTO_MIGRATE=1 da bu serverning umuman ko'tarilmasligi demakdir.
+--   Bitta view — bitta fayl.
 
 -- Zakaz kesimi: bir mijozning bitta zakazdagi hamma mahsuloti
 CREATE OR REPLACE VIEW v_orders AS
