@@ -47,7 +47,12 @@ INSERT INTO customer_channels (code, name, sort) VALUES
   ('SAYT',      'Sayt',                 5),
   ('KORGAZMA',  'Ko''rgazma / bozor',   6),
   ('DILER',     'Diler / hamkor',       7),
-  ('BOSHQA',    'Boshqa',              99)
+  ('BOSHQA',    'Boshqa',              99),
+  -- Mijoz turi: u bilan qanday ishlanadi. Yuqoridagilar mijoz qayerdan
+  -- kelganini yozadi, bular esa qanday sotilishini.
+  ('B2B',       'B2B — diler / do''kon', 10),
+  ('B2C',       'B2C — chakana',         11),
+  ('EXPORT',    'Eksport',               12)
 ON CONFLICT (code) DO NOTHING;
 
 -- Mijoz. To'liq savdo moduli keyin quriladi — hozir jurnalga yetarli minimum.

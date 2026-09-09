@@ -181,27 +181,41 @@ function openImport(){
           <h1>Ro'yxatni import qilish</h1><button onclick="close_()">Yopish</button></div>
         <p class="muted" style="margin-bottom:14px">Har qator bitta mijoz, maydonlar
           nuqtali vergul bilan ajratiladi:<br>
-          <code>Mijoz nomi ; Respublika ; Region ; Tel raqami ; Kanal</code></p>
+          <code>Mijoz nomi ; Respublika ; Region ; Tel raqami ; Kanal ; Savdo menejeri</code></p>
         <p class="muted" style="margin-bottom:14px;font-size:13px">Respublika bo'sh
           qoldirilsa O'zbekiston deb olinadi.</p>
         <p class="muted" style="margin-bottom:14px;font-size:13px">Kanal kodlari:
           ${channels.map(c => esc(c.code)).join(' · ')}</p>
+        <p class="muted" style="margin-bottom:14px;font-size:13px">Savdo menejeri —
+          xodim ismi, aynan ro'yxatdagidek. Bo'sh qoldirilsa biriktirilmaydi.
+          Hozir bor: ${managers.map(m => esc(m.name)).join(' · ')}</p>
         <textarea id="imp" rows="10" style="width:100%;font:13px ui-monospace,monospace;
           background:var(--surface-2);color:var(--text);border:1px solid var(--line);
           border-radius:10px;padding:12px"
-          placeholder="Sardor Alimov ; O'zbekiston ; Toshkent shahri ; +998901112233 ; INSTAGRAM
-Mebel Savdo MCHJ ; Qozog'iston ; Almati ; +77015554433 ; DILER"></textarea>
+          placeholder="Sardor Alimov ; O'zbekiston ; Toshkent shahri ; +998901112233 ; B2B ; Pulatov Soyibjon
+Mebel Savdo MCHJ ; Qozog'iston ; Almati ; +77015554433 ; EXPORT ; Jomonqulov Shamshod"></textarea>
         <button class="primary" style="width:100%;margin-top:14px" onclick="runImport()">Import qilish</button>
       </div></div>`;
 }
 
 async function runImport(){
+  const unknown = new Set();
   const items = $('imp').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const [name, country, region, phone, channel] = l.split(';').map(x => (x || '').trim());
+    const [name, country, region, phone, channel, manager] =
+      l.split(';').map(x => (x || '').trim());
+    const m = manager
+      ? managers.find(w => w.name.toLowerCase() === manager.toLowerCase()) : null;
+    if (manager && !m) unknown.add(manager);
     return { name, country: country || null, region: region || null,
-             phone: phone || null, channel: channel ? channel.toUpperCase() : null };
+             phone: phone || null, channel: channel ? channel.toUpperCase() : null,
+             manager_id: m ? m.id : null };
   }).filter(x => x.name);
   if (!items.length) return alert('Qator topilmadi');
+  // Nomi topilmagan menejer jim o'tkazib yuborilsa, mijoz menejersiz kirib
+  // qolardi va menejer hisobotidan tushib qolardi. Shuning uchun to'xtatamiz.
+  if (unknown.size) return alert('Bu xodimlar ro\'yxatda yo\'q:\n\n' +
+    [...unknown].join('\n') +
+    '\n\nAvval Xodimlar sahifasida qo\'shing, keyin qayta import qiling.');
   try{
     const r = await App.api('/api/units/customers',
       { method:'POST', body: JSON.stringify({ items }) });
