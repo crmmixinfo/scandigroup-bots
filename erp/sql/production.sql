@@ -353,7 +353,10 @@ CREATE OR REPLACE VIEW v_plan_fact AS
 SELECT pl.work_date, pl.line_id, pl.product_id, p.name AS product,
        pl.qty AS plan_qty,
        COALESCE(SUM(f.qty_ok), 0) AS fact_qty,
-       ROUND(100.0 * COALESCE(SUM(f.qty_ok), 0) / NULLIF(pl.qty, 0), 1) AS pct
+       ROUND(100.0 * COALESCE(SUM(f.qty_ok), 0) / NULLIF(pl.qty, 0), 1) AS pct,
+       -- Yangi ustun oxirida: CREATE OR REPLACE VIEW mavjud bazada
+       -- ustunni faqat oxiriga qo'sha oladi, o'rtaga qo'yolmaydi.
+       p.sku
 FROM plans pl
 JOIN products p ON p.id = pl.product_id
 LEFT JOIN shifts sh ON sh.work_date = pl.work_date AND sh.line_id = pl.line_id
@@ -361,7 +364,7 @@ LEFT JOIN flow_log f
        ON f.shift_id = sh.id
       AND f.product_id = pl.product_id
       AND f.section_id IN (SELECT id FROM sections WHERE is_exit)
-GROUP BY pl.work_date, pl.line_id, pl.product_id, p.name, pl.qty;
+GROUP BY pl.work_date, pl.line_id, pl.product_id, p.name, p.sku, pl.qty;
 
 -- ★ KOMPLEKTLILIK: omborda nechta TO'LIQ to'plam yig'ish mumkin.
 --   "500 dona ishlab chiqarildi" ≠ "40 to'plam sotish mumkin".

@@ -190,8 +190,10 @@ Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
 
 - **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K26-0001`
   shaklida avtomatik taklif qilinadi. Raqam **butun to'plamga** qo'yiladi:
-  "Milano PK — K26-0001". To'plam bir butun bo'lib liniyadan o'tadi,
-  shuning uchun to'plamning o'zi marshrutga ega.
+  "Milano · Mehmonxona to'plami — K26-0001". To'plam bir butun bo'lib
+  liniyadan o'tadi, shuning uchun to'plamning o'zi marshrutga ega.
+  Mahsulot nomi — faqat fason ("Milano"); turi guruh ustunida alohida
+  turadi, shuning uchun nomga takrorlab yozilmaydi.
 - **Zakaz №** — savdo bo'limi zakaz tushganda qo'yadi. Bir mijoz mehmonxona
   to'plami + stol + stul olsa, uchalasiga bitta zakaz raqami qo'yiladi va
   jurnalda shu raqam bo'yicha filtrlanadi. Zakaz hali yo'q bo'lsa faqat

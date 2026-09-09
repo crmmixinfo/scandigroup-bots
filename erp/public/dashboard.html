@@ -130,7 +130,8 @@ async function load(){
       <td class="num">${n(b.queue_qty)}</td></tr>`).join('') : empty(3, 'Navbat yo\'q');
 
   $('tPlan').innerHTML = d.planFact.length ? d.planFact.map(r =>
-    `<tr><td>${r.product}</td><td class="num">${n(r.plan_qty)}</td>
+    `<tr><td>${r.product}<div class="muted" style="font-size:12px">${r.sku}</div></td>
+      <td class="num">${n(r.plan_qty)}</td>
       <td class="num">${n(r.fact_qty)}</td><td class="num">${pctTag(Number(r.pct))}</td></tr>`).join('')
     : empty(4, 'Reja kiritilmagan');
 
