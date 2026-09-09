@@ -10,11 +10,55 @@ ochiladi. Vaziyatingizga qarab birini tanlang.
 **Qachon:** bir necha xodim bir vaqtda ishlaydi, ma'lumot doimiy saqlanadi.
 Sizga aynan shu kerak.
 
+### Vercel — tavsiya etiladi
+
+Uxlab qolmaydi, domen bepul, har push'dan keyin o'zi yangilanadi. Vercel'ning
+o'z bazasi yo'q, shuning uchun baza alohida olinadi — Neon bepul tarifi yetadi.
+
+1. **Baza.** [neon.tech](https://neon.tech) → **New Project** → **Connection
+   string** ni nusxa oling. Ro'yxatdan **Pooled connection** turini tanlang —
+   satrida `-pooler` bo'ladi. Serverless bilan aynan shu ishlaydi.
+2. [vercel.com](https://vercel.com) → **Add New** → **Project** →
+   `crmmixinfo/scandigroup-bots` ni import qiling.
+3. **Settings → Environment Variables** ga bitta qator:
+   ```
+   DATABASE_URL=<Neon bergan pooled satr>
+   ```
+   `PGSSL` ni QO'YMANG — Neon SSL talab qiladi.
+   `ERP_AUTO_MIGRATE` ham kerak emas: bazani build o'zi tayyorlaydi.
+4. **Settings → Git → Production Branch** ni `claude/salom-asulmx` qiling.
+   Standart holatda `main` turadi, unda ERP yo'q.
+5. **Deploy**.
+
+Loyiha allaqachon shu yerda turibdi: **https://scandi-erp.vercel.app**
+
+**Build logida nima ko'rinishi kerak:**
+```
+  core.sql              OK
+  ...
+Baza tayyor: {"tsexlar":"4","bolimlar":"24","sku":"32",...}
+```
+Bu chiqsa — baza tayyor. Manzilni oching, PIN `0000`.
+
+**Agar xato chiqsa:**
+
+| Logdagi yozuv | Sabab | Yechim |
+|---|---|---|
+| `DATABASE_URL kiritilmagan` | o'zgaruvchi qo'yilmagan yoki faqat Preview uchun belgilangan | 3-qadam; o'zgaruvchi **Production** uchun ham yoqilgan bo'lsin |
+| 404 yoki bo'sh sahifa | `main` branch deploy bo'lgan | 4-qadam: Production Branch |
+| `too many connections` | direct (pooler'siz) satr ishlatilgan | Neon'dan `-pooler` li satrni oling |
+| `self signed certificate` | `PGSSL` qo'shib qo'yilgan | o'zgaruvchini o'chiring |
+
+**Botlar Vercel'da ishlamaydi.** `hr-bot.js` va `candidate-bot.js` uzluksiz
+ishlab turuvchi jarayon talab qiladi (long polling), serverless esa faqat
+so'rov kelganda uyg'onadi. Botlarni Railway'da yoki alohida serverda qoldiring —
+ERP bilan bir bazaga ulanadi, ikkalasi birga ishlaydi.
+
 ### Railway
 
 1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
 2. `crmmixinfo/scandigroup-bots` ni tanlang.
-3. **Settings → Source** da branch'ni `claude/mebel-production-monitoring-nje80r`
+3. **Settings → Source** da branch'ni `claude/salom-asulmx`
    ga o'zgartiring. Standart holatda `main` turadi, unda ERP yo'q.
 4. Loyihada **+ New** → **Database** → **Add PostgreSQL**.
 5. Dastur xizmatining **Variables** bo'limiga ikkita qator qo'shing:
@@ -66,7 +110,7 @@ Faqat shu kompyuterdan ochiladi.
 [Docker Desktop](https://docker.com/products/docker-desktop) o'rnatilgan bo'lsa:
 
 ```bash
-git clone -b claude/mebel-production-monitoring-nje80r \
+git clone -b claude/salom-asulmx \
   https://github.com/crmmixinfo/scandigroup-bots.git
 cd scandigroup-bots
 docker compose up
@@ -85,7 +129,7 @@ To'xtatish: `Ctrl+C`. Ma'lumot `pgdata/` papkasida qoladi, qayta
 **Kerak:** Node.js 18+ va PostgreSQL 14+.
 
 ```bash
-git clone -b claude/mebel-production-monitoring-nje80r \
+git clone -b claude/salom-asulmx \
   https://github.com/crmmixinfo/scandigroup-bots.git
 cd scandigroup-bots
 cp .env.example .env
@@ -133,6 +177,8 @@ Rollar:
 
 - **Demo PIN'lar ochiq turibdi.** Serverga qo'yganingizdan keyin birinchi ish —
   o'z xodimlaringizni kiritib, demo hisoblarni o'chirish.
-- **Ma'lumot faqat bazada.** Railway/Render bazasi doimiy; Docker'da
-  `pgdata/` papkasida. Bu papkani o'chirmang.
-- **Zaxira nusxa.** Railway'da baza uchun avtomatik backup yoqib qo'ying.
+- **Ma'lumot faqat bazada.** Vercel'da hech narsa saqlanmaydi — hammasi
+  Neon bazasida. Railway/Render bazasi ham doimiy; Docker'da `pgdata/`
+  papkasida, uni o'chirmang.
+- **Zaxira nusxa.** Neon'da **Branches/PITR**, Railway'da avtomatik backup
+  yoqib qo'ying. Bazani yo'qotsangiz — hamma ish yo'qoladi.

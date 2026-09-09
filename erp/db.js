@@ -1,9 +1,14 @@
 const { Pool } = require('pg');
 
+// Serverless'da (Vercel) har so'rov o'z nusxasida ishlaydi va har nusxa o'z
+// hovuzini ochadi — 20 tadan bo'lsa baza ulanish limiti bir necha o'nlab
+// parallel so'rovdayoq tugaydi. Shuning uchun u yerda hovuz 1 ta ulanish.
+const SERVERLESS = Boolean(process.env.VERCEL);
+
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === 'off' ? false : { rejectUnauthorized: false },
-  max: Number(process.env.PG_POOL_MAX || 20),
+  max: Number(process.env.PG_POOL_MAX || (SERVERLESS ? 1 : 20)),
   idleTimeoutMillis: 30000,
   // Hovuz tugaganda so'rov cheksiz kutmasin — xato bergani ma'qul
   connectionTimeoutMillis: 10000,

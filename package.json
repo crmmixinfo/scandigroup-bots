@@ -5,6 +5,7 @@
     "start": "node erp/server.js",
     "hr": "node hr-bot.js",
     "erp:migrate": "node erp/migrate.js",
+    "vercel-build": "node erp/migrate.js",
     "candidate": "node candidate-bot.js"
   },
   "dependencies": {
