@@ -2,10 +2,10 @@
   "name": "scandigroup-bots",
   "version": "1.0.0",
   "scripts": {
-    "start": "node candidate-bot.js",
+    "start": "node erp/server.js",
     "hr": "node hr-bot.js",
-    "erp": "node erp/server.js",
-    "erp:migrate": "node erp/migrate.js"
+    "erp:migrate": "node erp/migrate.js",
+    "candidate": "node candidate-bot.js"
   },
   "dependencies": {
     "dotenv": "^16.3.0",

@@ -297,7 +297,7 @@ HTTPS'ni platforma o'zi beradi.
 cp .env.example .env        # DATABASE_URL ni to'ldiring, PGSSL=off qo'shing
 npm install
 npm run erp:migrate         # bazani yaratadi; qayta ishga tushirish xavfsiz
-npm run erp                 # -> http://localhost:3000
+npm start                   # -> http://localhost:3000
 ```
 
 Demo PIN: `0000` admin · `5555` direktor · `1111`–`4444` tsex ustalari ·

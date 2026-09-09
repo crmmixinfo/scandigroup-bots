@@ -81,7 +81,7 @@ Keyin:
 createdb scandi_erp
 npm install
 npm run erp:migrate
-npm run erp
+npm start
 ```
 
 Brauzerda: **http://localhost:3000**
