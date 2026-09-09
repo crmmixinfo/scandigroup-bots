@@ -1,25 +1,16 @@
-require('dotenv').config();
-const path = require('path');
+// ============================================================================
+//  ISHLAB CHIQARISH MODULI
+//  Yo'llar /api ostiga ulanadi (server.js). Huquqlar:
+//    production.view   — ko'rish
+//    production.entry  — dona o'tkazish, brak, to'xtash, partiya
+//    production.manage — smena yopish, spravochnik
+// ============================================================================
 const express = require('express');
-const { Pool } = require('pg');
+const { db, wrap, today, daysAgo } = require('../db');
+const { need } = require('../auth');
 
-const app = express();
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL === 'off' ? false : { rejectUnauthorized: false },
-});
+const router = express.Router();
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-const wrap = (fn) => (req, res) =>
-  fn(req, res).catch((e) => {
-    console.error(e);
-    res.status(500).json({ error: e.message });
-  });
-
-const today = () => new Date().toISOString().slice(0, 10);
-const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 
 // Smenani MAHSULOT YO'NALISHI bo'yicha topadi yoki ochadi.
 // Umumiy bo'yoqlash tsexida operator ikkala yo'nalish mahsulotini ishlaydi —
@@ -36,20 +27,8 @@ async function resolveShift(client, productId, shiftNo = 1, workerId = null) {
   return rows[0].id;
 }
 
-// ─────────────────────────────────────────────────────────────── AUTH (oddiy)
-// Tsex terminali PIN bilan ochiladi. Ofis paneli uchun Telegram Mini App
-// initData tekshiruvi qo'shilishi kerak — README dagi "Hali qilinmagan"ga qarang.
-app.post('/api/login', wrap(async (req, res) => {
-  const { rows } = await db.query(
-    `SELECT w.id, w.name, w.role, w.shop_id, s.name AS shop, s.line_id, s.is_shared
-       FROM workers w LEFT JOIN shops s ON s.id = w.shop_id
-      WHERE w.pin = $1 AND w.active`, [req.body.pin]);
-  if (!rows[0]) return res.status(401).json({ error: 'PIN topilmadi' });
-  res.json(rows[0]);
-}));
-
 // ────────────────────────────────────────────────────────────── SPRAVOCHNIKLAR
-app.get('/api/ref', wrap(async (_req, res) => {
+router.get('/ref', need('production.view', 'production.entry'), wrap(async (_req, res) => {
   const [lines, shops, sections, products, chambers, defectReasons, downtimeReasons] =
     await Promise.all([
       db.query(`SELECT * FROM lines WHERE active ORDER BY sort`),
@@ -73,7 +52,7 @@ app.get('/api/ref', wrap(async (_req, res) => {
 
 // Bo'lim konteksti. Umumiy tsexda ikkala yo'nalish mahsuloti chiqadi —
 // shuning uchun har mahsulot yonida yo'nalish nomi ko'rsatiladi.
-app.get('/api/section/:id/context', wrap(async (req, res) => {
+router.get('/section/:id/context', need('production.view', 'production.entry'), wrap(async (req, res) => {
   const sectionId = Number(req.params.id);
   const section = (await db.query(
     `SELECT sc.*, sh.name AS shop, sh.kind, sh.line_id, sh.is_shared
@@ -109,7 +88,7 @@ app.get('/api/section/:id/context', wrap(async (req, res) => {
 }));
 
 // ──────────────────────────────────────────────────────────────────── SMENA
-app.get('/api/shift/current', wrap(async (req, res) => {
+router.get('/shift/current', need('production.view', 'production.entry'), wrap(async (req, res) => {
   const { rows } = await db.query(
     `SELECT * FROM shifts
       WHERE work_date = $1 AND line_id = $2 AND shift_no = $3 AND closed_at IS NULL`,
@@ -117,19 +96,21 @@ app.get('/api/shift/current', wrap(async (req, res) => {
   res.json(rows[0] || null);
 }));
 
-app.post('/api/shift/:id/close', wrap(async (req, res) => {
+router.post('/shift/:id/close', need('production.manage'), wrap(async (req, res) => {
   const { rows } = await db.query(
     `UPDATE shifts SET closed_at = NOW() WHERE id = $1 RETURNING *`, [req.params.id]);
   res.json(rows[0] || null);
 }));
 
 // ─────────────────────────────────────────────── ★ ASOSIY: bo'limdan o'tkazish
-app.post('/api/flow', wrap(async (req, res) => {
+router.post('/flow', need('production.entry'), wrap(async (req, res) => {
   const {
     section_id, product_id, shift_no = 1,
-    qty_ok = 0, qty_defect = 0, worker_id,
+    qty_ok = 0, qty_defect = 0,
     defect_reason, origin_section_id, note,
   } = req.body;
+  // Kim yozgani — sessiyadan. Klient boshqa xodim nomidan yoza olmaydi.
+  const worker_id = req.user.id;
 
   if (!section_id || !product_id)
     return res.status(400).json({ error: 'section_id va product_id majburiy' });
@@ -139,12 +120,12 @@ app.post('/api/flow', wrap(async (req, res) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    const shiftId = await resolveShift(client, product_id, shift_no, worker_id || null);
+    const shiftId = await resolveShift(client, product_id, shift_no, worker_id);
 
     const flow = (await client.query(
       `INSERT INTO flow_log (shift_id, section_id, product_id, qty_ok, qty_defect, worker_id, note)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [shiftId, section_id, product_id, qty_ok, qty_defect, worker_id || null, note || null]
+      [shiftId, section_id, product_id, qty_ok, qty_defect, worker_id, note || null]
     )).rows[0];
 
     if (qty_defect > 0) {
@@ -176,7 +157,7 @@ app.post('/api/flow', wrap(async (req, res) => {
 }));
 
 // Oxirgi yozuvni bekor qilish (operator xato kiritsa)
-app.delete('/api/flow/:id', wrap(async (req, res) => {
+router.delete('/flow/:id', need('production.entry'), wrap(async (req, res) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -203,16 +184,17 @@ app.delete('/api/flow/:id', wrap(async (req, res) => {
 // ─────────────────────────────────────────────────────────────────── PROSTOY
 // To'xtash bo'limga bog'langan, smenaga emas: umumiy bo'yoqlash tsexi
 // to'xtaganda u bitta yo'nalishga tegishli bo'lmaydi.
-app.post('/api/downtime/start', wrap(async (req, res) => {
-  const { section_id, reason_code, worker_id, note, shift_no = 1 } = req.body;
+router.post('/downtime/start', need('production.entry'), wrap(async (req, res) => {
+  const { section_id, reason_code, note, shift_no = 1 } = req.body;
+  const worker_id = req.user.id;
   const { rows } = await db.query(
     `INSERT INTO downtime (section_id, reason_code, worker_id, note, shift_no)
      VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [section_id, reason_code, worker_id || null, note || null, shift_no]);
+    [section_id, reason_code, worker_id, note || null, shift_no]);
   res.json(rows[0]);
 }));
 
-app.post('/api/downtime/:id/stop', wrap(async (req, res) => {
+router.post('/downtime/:id/stop', need('production.entry'), wrap(async (req, res) => {
   const { rows } = await db.query(
     `UPDATE downtime SET ended_at = NOW() WHERE id = $1 AND ended_at IS NULL RETURNING *`,
     [req.params.id]);
@@ -220,16 +202,17 @@ app.post('/api/downtime/:id/stop', wrap(async (req, res) => {
 }));
 
 // ────────────────────────────────────────────────────── BO'YOQLASH PARTIYASI
-app.post('/api/paint/start', wrap(async (req, res) => {
-  const { section_id, chamber_id, product_id, qty, worker_id, shift_no = 1 } = req.body;
+router.post('/paint/start', need('production.entry'), wrap(async (req, res) => {
+  const { section_id, chamber_id, product_id, qty, shift_no = 1 } = req.body;
+  const worker_id = req.user.id;
   const { rows } = await db.query(
     `INSERT INTO paint_batches (section_id, chamber_id, product_id, qty, worker_id, shift_no)
      VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [section_id, chamber_id || null, product_id, qty, worker_id || null, shift_no]);
+    [section_id, chamber_id || null, product_id, qty, worker_id, shift_no]);
   res.json(rows[0]);
 }));
 
-app.post('/api/paint/:id/finish', wrap(async (req, res) => {
+router.post('/paint/:id/finish', need('production.entry'), wrap(async (req, res) => {
   const { rows } = await db.query(
     `UPDATE paint_batches SET ended_at = NOW(), repaint_qty = $2 WHERE id = $1 RETURNING *`,
     [req.params.id, req.body.repaint_qty || 0]);
@@ -237,7 +220,7 @@ app.post('/api/paint/:id/finish', wrap(async (req, res) => {
 }));
 
 // ─────────────────────────────────────────────────────────────────── HISOBOT
-app.get('/api/dashboard', wrap(async (req, res) => {
+router.get('/dashboard', need('production.view'), wrap(async (req, res) => {
   const date = req.query.date || today();
   // Brak va prostoy Pareto'si bir kun uchun ma'nosiz — davr bo'yicha olinadi.
   const from = req.query.from || daysAgo(30);
@@ -301,7 +284,7 @@ app.get('/api/dashboard', wrap(async (req, res) => {
 
 // ══════════════════════════════════════ ZAVOD KO'RINISHI
 // "Hozir nima qayerda, qachon keyingi tsexga o'tadi, qachon omborga kiradi"
-app.get('/api/factory', wrap(async (req, res) => {
+router.get('/factory', need('production.view'), wrap(async (req, res) => {
   const { line_id, group_id, q } = req.query;
 
   const [shopLoad, positions, movements, fgStock, rateHealth] = await Promise.all([
@@ -344,7 +327,7 @@ app.get('/api/factory', wrap(async (req, res) => {
 }));
 
 // Bitta SKU: marshrut bo'ylab to'liq holat
-app.get('/api/product/:id/progress', wrap(async (req, res) => {
+router.get('/product/:id/progress', need('production.view'), wrap(async (req, res) => {
   const [product, progress] = await Promise.all([
     db.query(
       `SELECT p.id, p.sku, p.name, p.is_set, g.name AS group_name, pl.line_name,
@@ -361,7 +344,7 @@ app.get('/api/product/:id/progress', wrap(async (req, res) => {
   res.json({ product: product.rows[0], progress: progress.rows });
 }));
 
-app.get('/api/wip', wrap(async (_req, res) => {
+router.get('/wip', need('production.view'), wrap(async (_req, res) => {
   const { rows } = await db.query(
     `SELECT p.name AS product, pl.line_name, sc.name AS section, sh.name AS shop,
             w.step_no, w.queue_qty
@@ -375,7 +358,4 @@ app.get('/api/wip', wrap(async (_req, res) => {
   res.json(rows);
 }));
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Production API → http://localhost:${PORT}`));
+module.exports = router;

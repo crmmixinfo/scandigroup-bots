@@ -173,13 +173,27 @@ INSERT INTO downtime_reasons (code, name, sort) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- ------------------------------------------------------------- TEST XODIMLARI
-INSERT INTO workers (name, pin, role, shop_id) VALUES
-  ('Admin',            '0000', 'admin',  NULL),
-  ('Korpus ustasi',    '1111', 'master', (SELECT id FROM shops WHERE code='KORPUS')),
-  ('Bo''yoq ustasi',   '2222', 'master', (SELECT id FROM shops WHERE code='BOYOQ')),
-  ('Qadoqlash ustasi', '3333', 'master', (SELECT id FROM shops WHERE code='QADOQ')),
-  ('Stul ustasi',      '4444', 'master', (SELECT id FROM shops WHERE code='STUL'))
+-- Rollar va huquqlar yadroda: sql/core-seed.sql
+INSERT INTO workers (name, pin) VALUES
+  ('Administrator',    '0000'),
+  ('Korpus ustasi',    '1111'),
+  ('Bo''yoq ustasi',   '2222'),
+  ('Qadoqlash ustasi', '3333'),
+  ('Stul ustasi',      '4444'),
+  ('Direktor',         '5555'),
+  ('Arra operatori',   '6666')
 ON CONFLICT (pin) DO NOTHING;
+
+-- Rol biriktirish. scope_shop_id — usta faqat o'z tsexini ko'radi.
+INSERT INTO worker_roles (worker_id, role_code, scope_shop_id) VALUES
+  ((SELECT id FROM workers WHERE pin='0000'), 'admin',     NULL),
+  ((SELECT id FROM workers WHERE pin='5555'), 'direktor',  NULL),
+  ((SELECT id FROM workers WHERE pin='1111'), 'tsex_usta', (SELECT id FROM shops WHERE code='KORPUS')),
+  ((SELECT id FROM workers WHERE pin='2222'), 'tsex_usta', (SELECT id FROM shops WHERE code='BOYOQ')),
+  ((SELECT id FROM workers WHERE pin='3333'), 'tsex_usta', (SELECT id FROM shops WHERE code='QADOQ')),
+  ((SELECT id FROM workers WHERE pin='4444'), 'tsex_usta', (SELECT id FROM shops WHERE code='STUL')),
+  ((SELECT id FROM workers WHERE pin='6666'), 'operator',  (SELECT id FROM shops WHERE code='KORPUS'))
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 --  MUDDAT BASHORATI UCHUN QUVVAT (ixtiyoriy, lekin tavsiya etiladi)

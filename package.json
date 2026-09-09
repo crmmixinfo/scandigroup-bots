@@ -4,7 +4,7 @@
   "scripts": {
     "start": "node candidate-bot.js",
     "hr": "node hr-bot.js",
-    "production": "node production/api.js"
+    "erp": "node erp/server.js"
   },
   "dependencies": {
     "dotenv": "^16.3.0",

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scandi ERP</title>
+<link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><h1>Scandi ERP</h1></div>
+  <div class="row" id="erpUser"></div>
+</div>
+
+<div class="grid g3" id="pages"></div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Modullar</h2>
+  <div id="modules" class="grid g3"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const PAGES = [
+  { href:'/zavod.html', title:"Zavod ko'rinishi", lead:'Nima qayerda',
+    text:"Har mahsulot qaysi tsex va bo'limda · qachon keyingi tsexga o'tadi · qachon omborga kiradi",
+    perm:['production.view'] },
+  { href:'/dashboard.html', title:'Boshqaruv paneli', lead:"Ko'rsatkichlar",
+    text:"Reja/fakt · bottleneck · komplektlilik · umumiy tsex yuklamasi · Pareto",
+    perm:['production.view'] },
+  { href:'/terminal.html', title:"Bo'lim terminali", lead:'Tsex planshetlari',
+    text:"Dona qayd etish · brak · to'xtash · kamera partiyasi",
+    perm:['production.entry'] },
+];
+
+App.start(async () => {
+  $('pages').innerHTML = PAGES.filter(p => App.can(...p.perm)).map(p => `
+    <a class="card" href="${p.href}" style="text-decoration:none;color:inherit">
+      <h2>${p.title}</h2>
+      <p style="font-size:18px;font-weight:500">${p.lead}</p>
+      <p class="muted" style="margin-top:8px">${p.text}</p></a>`).join('');
+
+  const mods = await App.api('/api/modules');
+  $('modules').innerHTML = mods.map(m => `
+    <div class="card" style="background:var(--surface-2)">
+      <div class="row" style="justify-content:space-between">
+        <strong>${m.name}</strong>
+        <span class="tag ${m.ready ? 'ok' : ''}">${m.ready ? 'ishlayapti' : 'rejada'}</span>
+      </div>
+    </div>`).join('') || '<p class="muted">Ochiq modul yo\'q</p>';
+});
+</script>
+</body>
+</html>

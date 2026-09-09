@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ishlab chiqarish paneli · Scandi</title>
 <link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
 </head>
 <body>
 
@@ -13,6 +15,7 @@
   <div class="row">
     <input id="date" type="date" style="width:auto">
     <button onclick="load()">Yangilash</button>
+    <span class="row" id="erpUser"></span>
   </div>
 </div>
 
@@ -82,7 +85,7 @@ const pctTag = p => `<span class="tag ${p >= 95 ? 'ok' : p >= 80 ? 'warn' : 'bad
 const empty = (c, t) => `<tr><td class="muted" colspan="${c}">${t}</td></tr>`;
 
 async function load(){
-  const d = await fetch('/api/dashboard?date=' + $('date').value).then(r => r.json());
+  const d = await App.api('/api/dashboard?date=' + $('date').value);
 
   const sum = (a, f) => a.reduce((s, r) => s + Number(f(r)), 0);
   const planTotal   = sum(d.planFact, r => r.plan_qty);
@@ -158,8 +161,8 @@ async function load(){
     : empty(6, 'Bu sanada ma\'lumot yo\'q');
 }
 
-load();
-setInterval(load, 60000);
+App.start(load, 'production.view');
+setInterval(() => App.me() && load(), 60000);
 </script>
 </body>
 </html>

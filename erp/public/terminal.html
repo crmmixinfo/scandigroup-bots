@@ -5,27 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Bo'lim terminali · Scandi</title>
 <link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
 </head>
 <body>
 
 <div class="top">
   <div class="brand"><span class="dot"></span><h1 id="ttl">Bo'lim terminali</h1></div>
-  <div class="row"><span class="muted" id="who"></span>
-    <button id="logout" class="hide">Chiqish</button></div>
+  <div class="row" id="erpUser"></div>
 </div>
 
-<!-- 1 · PIN -->
-<section id="scLogin" class="card" style="max-width:360px;margin:0 auto">
-  <h2>Kirish</h2>
-  <label>PIN kod</label>
-  <input id="pin" type="tel" inputmode="numeric" maxlength="4" placeholder="••••"
-         style="font-size:28px;text-align:center;letter-spacing:.4em">
-  <button class="primary" style="width:100%;margin-top:14px" onclick="login()">Kirish</button>
-  <p class="muted" style="margin-top:12px;font-size:13px">Demo: 1111 · 2222 · 3333 · 4444</p>
-</section>
-
-<!-- 2 · Bo'lim tanlash -->
-<section id="scPick" class="card hide" style="max-width:520px;margin:0 auto">
+<!-- 1 · Bo'lim tanlash -->
+<section id="scPick" class="card" style="max-width:520px;margin:0 auto">
   <h2>Bo'limni tanlang</h2>
   <div class="stack">
     <div><label>Tsex</label><select id="selShop" onchange="fillSections()"></select></div>
@@ -36,7 +27,7 @@
   </div>
 </section>
 
-<!-- 3 · Ish ekrani -->
+<!-- 2 · Ish ekrani -->
 <section id="scWork" class="hide">
   <div class="grid g2">
     <div class="card">
@@ -102,10 +93,9 @@
 </section>
 
 <script>
-const api = (u, o) => fetch(u, {headers:{'Content-Type':'application/json'}, ...o})
-  .then(async r => { const j = await r.json(); if(!r.ok) throw new Error(j.error||'Xato'); return j; });
+const api = App.api;
 const $ = id => document.getElementById(id);
-const show = (...ids) => ['scLogin','scPick','scWork'].forEach(s =>
+const show = (...ids) => ['scPick','scWork'].forEach(s =>
   $(s).classList.toggle('hide', !ids.includes(s)));
 
 let ref = null, me = null, sec = null, ctx = null, shiftNo = 1, cnt = 0, log = [], dt = null;
@@ -117,30 +107,16 @@ function toast(msg, bad){
   document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
 }
 
-async function boot(){
+async function boot(user){
+  me = user;
   ref = await api('/api/ref');
-  const saved = localStorage.getItem('me');
-  if (saved){ me = JSON.parse(saved); afterLogin(); }
-}
-
-async function login(){
-  try{
-    me = await api('/api/login', {method:'POST', body: JSON.stringify({pin: $('pin').value})});
-    localStorage.setItem('me', JSON.stringify(me));
-    afterLogin();
-  }catch(e){ toast(e.message, true); }
-}
-
-function afterLogin(){
-  $('who').textContent = me.name + ' · ' + me.role;
-  $('logout').classList.remove('hide');
-  $('selShop').innerHTML = ref.shops.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  if (me.shop_id) $('selShop').value = me.shop_id;
+  // Usta faqat o'z tsexini ko'radi (worker_roles.scope_shop_id)
+  const scope = me.scope_shop_ids || [];
+  const shops = scope.length ? ref.shops.filter(s => scope.includes(s.id)) : ref.shops;
+  $('selShop').innerHTML = shops.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   fillSections();
   show('scPick');
 }
-
-$('logout').onclick = () => { localStorage.clear(); location.reload(); };
 
 function fillSections(){
   const shopId = +$('selShop').value;
@@ -192,7 +168,7 @@ async function submitOk(){
   if (!product_id) return toast('Mahsulot tanlanmagan', true);
   try{
     const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
-      section_id: sec.id, product_id, shift_no: shiftNo, qty_ok: cnt, worker_id: me.id })});
+      section_id: sec.id, product_id, shift_no: shiftNo, qty_ok: cnt })});
     log.unshift({id: r.id, t:'ok', qty: cnt, name: $('selProduct').selectedOptions[0].text});
     renderLog(); toast(cnt + ' dona yozildi'); setCnt(0);
   }catch(e){ toast(e.message, true); }
@@ -205,7 +181,7 @@ async function submitDefect(){
     const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
       section_id: sec.id, product_id, shift_no: shiftNo,
       qty_defect: qty, defect_reason: $('selDefect').value,
-      origin_section_id: $('selOrigin').value || null, worker_id: me.id })});
+      origin_section_id: $('selOrigin').value || null })});
     log.unshift({id: r.id, t:'bad', qty, name: $('selDefect').selectedOptions[0].text});
     renderLog(); toast('Brak yozildi');
   }catch(e){ toast(e.message, true); }
@@ -217,7 +193,7 @@ async function startBatch(){
   try{
     await api('/api/paint/start', {method:'POST', body: JSON.stringify({
       section_id: sec.id, chamber_id: +$('selChamber').value, product_id,
-      qty: +$('batchQty').value, worker_id: me.id, shift_no: shiftNo })});
+      qty: +$('batchQty').value, shift_no: shiftNo })});
     ctx = await api('/api/section/' + sec.id + '/context');
     renderBatches(); toast('Partiya boshlandi');
   }catch(e){ toast(e.message, true); }
@@ -242,8 +218,7 @@ function renderBatches(){
 
 async function startDowntime(){
   dt = await api('/api/downtime/start', {method:'POST', body: JSON.stringify({
-    section_id: sec.id, reason_code: $('selDowntime').value,
-    worker_id: me.id, shift_no: shiftNo })});
+    section_id: sec.id, reason_code: $('selDowntime').value, shift_no: shiftNo })});
   renderDowntime();
 }
 async function stopDowntime(){
@@ -270,7 +245,7 @@ function renderLog(){
     : '<tr><td class="muted">Hozircha yozuv yo\'q</td></tr>';
 }
 
-boot();
+App.start(boot, 'production.entry');
 </script>
 </body>
 </html>

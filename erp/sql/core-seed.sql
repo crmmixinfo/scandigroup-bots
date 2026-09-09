@@ -1,0 +1,88 @@
+-- ============================================================================
+--  YADRO SPRAVOCHNIGI: huquqlar va rollar
+--
+--  Huquqlar bo'lajak modullar uchun ham oldindan yozilgan. Modul kodi hali
+--  yozilmagan bo'lsa ham huquq mavjud bo'ladi — modul qo'shilganda rollarni
+--  qayta o'ylab chiqish shart bo'lmaydi.
+-- ============================================================================
+
+INSERT INTO permissions (code, module, name) VALUES
+  -- Ishlab chiqarish (ishlayapti)
+  ('production.view',   'production', 'Ishlab chiqarishni ko''rish'),
+  ('production.entry',  'production', 'Bo''limdan dona o''tkazish, brak, to''xtash'),
+  ('production.manage', 'production', 'Marshrut, reja, spravochnik boshqaruvi'),
+  -- Xom ashyo va tayyor mahsulot ombori (rejada)
+  ('warehouse.view',    'warehouse',  'Ombor qoldiqlarini ko''rish'),
+  ('warehouse.move',    'warehouse',  'Kirim / chiqim / ko''chirish'),
+  ('warehouse.manage',  'warehouse',  'Inventarizatsiya, hisobdan chiqarish'),
+  -- Ta'minot (rejada)
+  ('purchasing.view',   'purchasing', 'Ta''minotchilar va buyurtmalarni ko''rish'),
+  ('purchasing.manage', 'purchasing', 'Ta''minot buyurtmasi berish'),
+  -- Savdo va mijozlar (rejada)
+  ('sales.view',        'sales',      'Mijozlar va sotuvni ko''rish'),
+  ('sales.manage',      'sales',      'Sotuv, zakaz, jo''natma'),
+  -- Kassa (rejada)
+  ('cash.view',         'cash',       'Kassa hisobotlarini ko''rish'),
+  ('cash.entry',        'cash',       'Kirim / chiqim kiritish'),
+  ('cash.manage',       'cash',       'Kassa yopish, tuzatish, tasdiqlash'),
+  -- Maosh (rejada)
+  ('payroll.view',      'payroll',    'Maosh hisobotlarini ko''rish'),
+  ('payroll.manage',    'payroll',    'Maosh hisoblash va to''lash'),
+  -- Boshqaruv
+  ('admin.users',       'admin',      'Xodim va rollarni boshqarish'),
+  ('admin.audit',       'admin',      'Audit jurnalini ko''rish')
+ON CONFLICT (code) DO NOTHING;
+
+-- Rollar. surface — bu rol qaysi ko'rinishda ishlaydi:
+--   web     — brauzer (kompyuter, ofis)
+--   miniapp — Telegram Mini App (telefon)
+--   bot     — faqat bot xabarlari, interfeys yo'q
+INSERT INTO roles (code, name, surface, sort) VALUES
+  ('admin',        'Administrator',           'web',     1),
+  ('direktor',     'Direktor',                'web',     2),
+  ('ishlab_boshl', 'Ishlab chiqarish boshlig''i','web',  3),
+  ('tsex_usta',    'Tsex ustasi',             'miniapp', 4),
+  ('operator',     'Bo''lim operatori',       'miniapp', 5),
+  ('omborchi',     'Omborchi',                'miniapp', 6),
+  ('taminotchi',   'Ta''minotchi',            'web',     7),
+  ('sotuvchi',     'Sotuv menejeri',          'web',     8),
+  ('kassir',       'Kassir',                  'web',     9),
+  ('buxgalter',    'Buxgalter',               'web',    10),
+  ('hr',           'HR / kadrlar',            'web',    11)
+ON CONFLICT (code) DO NOTHING;
+
+-- Admin — hamma huquq
+INSERT INTO role_permissions (role_code, permission_code)
+SELECT 'admin', code FROM permissions ON CONFLICT DO NOTHING;
+
+-- Direktor — hamma narsani ko'radi, kassani tasdiqlaydi
+INSERT INTO role_permissions (role_code, permission_code)
+SELECT 'direktor', code FROM permissions WHERE code LIKE '%.view'
+UNION ALL SELECT 'direktor', 'cash.manage'
+UNION ALL SELECT 'direktor', 'admin.audit'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_code, permission_code) VALUES
+  ('ishlab_boshl', 'production.view'), ('ishlab_boshl', 'production.entry'),
+  ('ishlab_boshl', 'production.manage'), ('ishlab_boshl', 'warehouse.view'),
+
+  ('tsex_usta',    'production.view'), ('tsex_usta',    'production.entry'),
+  ('operator',     'production.entry'),
+
+  ('omborchi',     'warehouse.view'), ('omborchi', 'warehouse.move'),
+  ('omborchi',     'production.view'),
+
+  ('taminotchi',   'purchasing.view'), ('taminotchi', 'purchasing.manage'),
+  ('taminotchi',   'warehouse.view'),
+
+  ('sotuvchi',     'sales.view'), ('sotuvchi', 'sales.manage'),
+  ('sotuvchi',     'warehouse.view'),
+
+  ('kassir',       'cash.view'), ('kassir', 'cash.entry'),
+
+  ('buxgalter',    'cash.view'), ('buxgalter', 'cash.manage'),
+  ('buxgalter',    'payroll.view'), ('buxgalter', 'payroll.manage'),
+  ('buxgalter',    'warehouse.view'), ('buxgalter', 'sales.view'),
+
+  ('hr',           'payroll.view'), ('hr', 'admin.users')
+ON CONFLICT DO NOTHING;

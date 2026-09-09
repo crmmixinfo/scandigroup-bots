@@ -1,6 +1,6 @@
 -- ============================================================================
---  SCANDI GROUP — MEBEL ISHLAB CHIQARISH MONITORINGI
---  PostgreSQL schema
+--  SCANDI ERP — ISHLAB CHIQARISH MODULI
+--  sql/core.sql dan KEYIN ishga tushiriladi (workers jadvaliga tayanadi)
 --
 --  Ierarxiya:  TSEX  →  BO'LIM  →  (mahsulot marshruti)
 --    Tsexlar: Korpus · Bo'yoqlash · Qadoqlash · Stul
@@ -158,18 +158,7 @@ CREATE TABLE IF NOT EXISTS product_route_skip (
   PRIMARY KEY (product_id, section_id)
 );
 
--- ------------------------------------------------------------------- XODIMLAR
-
-CREATE TABLE IF NOT EXISTS workers (
-  id      SERIAL PRIMARY KEY,
-  name    TEXT NOT NULL,
-  pin     TEXT UNIQUE,
-  tg_id   BIGINT,
-  role    TEXT NOT NULL DEFAULT 'operator'
-          CHECK (role IN ('operator','master','head','admin')),
-  shop_id INT REFERENCES shops(id),
-  active  BOOLEAN NOT NULL DEFAULT true
-);
+-- Xodimlar (workers) yadroda: sql/core.sql
 
 -- --------------------------------------------------------------------- SABAB
 

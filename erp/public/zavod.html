@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Zavod ko'rinishi · Scandi</title>
 <link rel="stylesheet" href="/style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/app.js"></script>
 </head>
 <body>
 
@@ -13,6 +15,7 @@
   <div class="row">
     <span class="muted" id="stamp"></span>
     <button onclick="load()">Yangilash</button>
+    <span class="row" id="erpUser"></span>
   </div>
 </div>
 
@@ -95,7 +98,7 @@ function ago(ts){
 }
 
 async function boot(){
-  ref = await fetch('/api/ref').then(r => r.json());
+  ref = await App.api('/api/ref');
   $('fLine').innerHTML = '<option value="">Barcha yo\'nalish</option>' +
     ref.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
   const groups = [...new Map(ref.products.map(p =>
@@ -111,7 +114,7 @@ async function load(){
   if ($('fGroup').value) p.set('group_id', $('fGroup').value);
   if ($('fQ').value.trim()) p.set('q', $('fQ').value.trim());
 
-  const d = await fetch('/api/factory?' + p).then(r => r.json());
+  const d = await App.api('/api/factory?' + p);
   $('stamp').textContent = new Date().toLocaleTimeString('uz-UZ',
     {hour:'2-digit', minute:'2-digit'});
 
@@ -165,7 +168,7 @@ async function load(){
 
 // Bitta SKU: marshrut bo'ylab to'liq yo'l
 async function openProduct(id){
-  const d = await fetch('/api/product/' + id + '/progress').then(r => r.json());
+  const d = await App.api('/api/product/' + id + '/progress');
   const here = d.progress.findIndex(s => Number(s.queue_qty) > 0);
   $('modalRoot').innerHTML = `
     <div class="overlay" onclick="if(event.target===this)closeModal()">
@@ -196,8 +199,8 @@ async function openProduct(id){
 const closeModal = () => { $('modalRoot').innerHTML = ''; };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-boot();
-setInterval(load, 60000);
+App.start(boot, 'production.view');
+setInterval(() => App.me() && load(), 60000);
 </script>
 </body>
 </html>
