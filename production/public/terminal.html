@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>Uchastka terminali · Scandi</title>
+<title>Bo'lim terminali · Scandi</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
 <div class="top">
-  <div class="brand"><span class="dot"></span><h1 id="ttl">Uchastka terminali</h1></div>
+  <div class="brand"><span class="dot"></span><h1 id="ttl">Bo'lim terminali</h1></div>
   <div class="row"><span class="muted" id="who"></span>
     <button id="logout" class="hide">Chiqish</button></div>
 </div>
@@ -24,13 +24,15 @@
   <p class="muted" style="margin-top:12px;font-size:13px">Demo: 1111 · 2222 · 3333 · 4444</p>
 </section>
 
-<!-- 2 · Uchastka tanlash -->
-<section id="scPick" class="card hide" style="max-width:480px;margin:0 auto">
-  <h2>Uchastkani tanlang</h2>
+<!-- 2 · Bo'lim tanlash -->
+<section id="scPick" class="card hide" style="max-width:520px;margin:0 auto">
+  <h2>Bo'limni tanlang</h2>
   <div class="stack">
-    <div><label>Liniya</label><select id="selLine" onchange="fillStations()"></select></div>
-    <div><label>Uchastka</label><select id="selStation"></select></div>
-    <button class="primary" onclick="openStation()">Boshlash</button>
+    <div><label>Tsex</label><select id="selShop" onchange="fillSections()"></select></div>
+    <div><label>Bo'lim</label><select id="selSection"></select></div>
+    <div><label>Smena</label>
+      <select id="selShift"><option value="1">1-smena</option><option value="2">2-smena</option></select></div>
+    <button class="primary" onclick="openSection()">Boshlash</button>
   </div>
 </section>
 
@@ -58,12 +60,24 @@
         <h2>Brak</h2>
         <div class="stack">
           <div><label>Sabab</label><select id="selDefect"></select></div>
-          <div><label>Kelib chiqqan uchastka (ixtiyoriy)</label>
-            <select id="selOrigin"><option value="">— aniqlanmagan —</option></select></div>
+          <div><label>Kelib chiqqan bo'lim (ixtiyoriy)</label><select id="selOrigin"></select></div>
           <div class="row">
             <input id="defQty" type="number" min="1" value="1" style="width:110px">
             <button class="danger" style="flex:1" onclick="submitDefect()">Brak yozish</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Bo'yoqlash tsexi uchun: kamera partiyasi -->
+      <div class="card hide" id="cardPaint">
+        <h2>Kamera partiyasi</h2>
+        <div class="stack">
+          <div class="row">
+            <select id="selChamber" style="flex:1"></select>
+            <input id="batchQty" type="number" min="1" value="20" style="width:110px">
+          </div>
+          <button onclick="startBatch()">Partiyani boshlash</button>
+          <div id="batchList"></div>
         </div>
       </div>
 
@@ -74,8 +88,7 @@
           <button onclick="startDowntime()">To'xtashni boshlash</button>
         </div>
         <div id="dtActive" class="hide stack">
-          <p><span class="tag bad">TO'XTAB TURIBDI</span>
-             <span class="muted" id="dtSince"></span></p>
+          <p><span class="tag bad">TO'XTAB TURIBDI</span> <span class="muted" id="dtSince"></span></p>
           <button class="primary" onclick="stopDowntime()">Ishni davom ettirish</button>
         </div>
       </div>
@@ -95,7 +108,7 @@ const $ = id => document.getElementById(id);
 const show = (...ids) => ['scLogin','scPick','scWork'].forEach(s =>
   $(s).classList.toggle('hide', !ids.includes(s)));
 
-let ref = null, me = null, station = null, ctx = null, shift = null, cnt = 0, log = [], dt = null;
+let ref = null, me = null, sec = null, ctx = null, shiftNo = 1, cnt = 0, log = [], dt = null;
 
 function toast(msg, bad){
   const t = document.createElement('div');
@@ -121,41 +134,43 @@ async function login(){
 function afterLogin(){
   $('who').textContent = me.name + ' · ' + me.role;
   $('logout').classList.remove('hide');
-  $('selLine').innerHTML = ref.lines
-    .map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-  if (me.line_id) $('selLine').value = me.line_id;
-  fillStations();
+  $('selShop').innerHTML = ref.shops.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  if (me.shop_id) $('selShop').value = me.shop_id;
+  fillSections();
   show('scPick');
 }
 
 $('logout').onclick = () => { localStorage.clear(); location.reload(); };
 
-function fillStations(){
-  const lineId = +$('selLine').value;
-  $('selStation').innerHTML = ref.stations.filter(s => s.line_id === lineId)
+function fillSections(){
+  const shopId = +$('selShop').value;
+  $('selSection').innerHTML = ref.sections.filter(s => s.shop_id === shopId)
     .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
 
-async function openStation(){
-  const id = +$('selStation').value;
-  ctx = await api('/api/station/' + id + '/context');
-  station = ctx.station;
-  $('ttl').textContent = station.name;
+async function openSection(){
+  shiftNo = +$('selShift').value;
+  ctx = await api('/api/section/' + $('selSection').value + '/context');
+  sec = ctx.section;
+  $('ttl').textContent = sec.shop + ' · ' + sec.name;
 
-  shift = await api('/api/shift/current?line_id=' + station.line_id);
-  if (!shift) shift = await api('/api/shift/open',
-    {method:'POST', body: JSON.stringify({line_id: station.line_id, worker_id: me.id})});
-
+  // Umumiy tsexda ikkala yo'nalish mahsuloti chiqadi — yo'nalish nomi ko'rsatiladi.
   $('selProduct').innerHTML = ctx.products.length
-    ? ctx.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+    ? ctx.products.map(p => `<option value="${p.id}">${
+        sec.is_shared ? p.line_name + ' · ' : ''}${p.name}</option>`).join('')
     : '<option value="">— marshrutda mahsulot yo\'q —</option>';
   $('selDefect').innerHTML = ref.defectReasons
     .map(r => `<option value="${r.code}">${r.name}</option>`).join('');
   $('selDowntime').innerHTML = ref.downtimeReasons
     .map(r => `<option value="${r.code}">${r.name}</option>`).join('');
   $('selOrigin').innerHTML = '<option value="">— aniqlanmagan —</option>' +
-    ref.stations.filter(s => s.line_id === station.line_id)
-      .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    ref.sections.map(s => `<option value="${s.id}">${s.shop} · ${s.name}</option>`).join('');
+
+  // Partiya paneli faqat bo'yoqlash (batch) tsexida
+  $('cardPaint').classList.toggle('hide', sec.kind !== 'batch');
+  $('selChamber').innerHTML = ref.chambers
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  renderBatches();
 
   dt = ctx.openDowntime; renderDowntime(); renderQueue();
   setCnt(0); log = []; renderLog();
@@ -177,10 +192,8 @@ async function submitOk(){
   if (!product_id) return toast('Mahsulot tanlanmagan', true);
   try{
     const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
-      shift_id: shift.id, station_id: station.id, product_id,
-      qty_ok: cnt, worker_id: me.id })});
-    log.unshift({id: r.id, t: 'ok', qty: cnt,
-      name: $('selProduct').selectedOptions[0].text});
+      section_id: sec.id, product_id, shift_no: shiftNo, qty_ok: cnt, worker_id: me.id })});
+    log.unshift({id: r.id, t:'ok', qty: cnt, name: $('selProduct').selectedOptions[0].text});
     renderLog(); toast(cnt + ' dona yozildi'); setCnt(0);
   }catch(e){ toast(e.message, true); }
 }
@@ -190,18 +203,47 @@ async function submitDefect(){
   if (!qty || !product_id) return toast('Ma\'lumot to\'liq emas', true);
   try{
     const r = await api('/api/flow', {method:'POST', body: JSON.stringify({
-      shift_id: shift.id, station_id: station.id, product_id,
+      section_id: sec.id, product_id, shift_no: shiftNo,
       qty_defect: qty, defect_reason: $('selDefect').value,
-      origin_station_id: $('selOrigin').value || null, worker_id: me.id })});
-    log.unshift({id: r.id, t: 'bad', qty, name: $('selDefect').selectedOptions[0].text});
+      origin_section_id: $('selOrigin').value || null, worker_id: me.id })});
+    log.unshift({id: r.id, t:'bad', qty, name: $('selDefect').selectedOptions[0].text});
     renderLog(); toast('Brak yozildi');
   }catch(e){ toast(e.message, true); }
 }
 
+async function startBatch(){
+  const product_id = +$('selProduct').value;
+  if (!product_id) return toast('Mahsulot tanlanmagan', true);
+  try{
+    await api('/api/paint/start', {method:'POST', body: JSON.stringify({
+      section_id: sec.id, chamber_id: +$('selChamber').value, product_id,
+      qty: +$('batchQty').value, worker_id: me.id, shift_no: shiftNo })});
+    ctx = await api('/api/section/' + sec.id + '/context');
+    renderBatches(); toast('Partiya boshlandi');
+  }catch(e){ toast(e.message, true); }
+}
+
+async function finishBatch(id){
+  const repaint = prompt('Qayta bo\'yash kerak bo\'lgan dona soni:', '0');
+  if (repaint === null) return;
+  await api('/api/paint/' + id + '/finish',
+    {method:'POST', body: JSON.stringify({repaint_qty: +repaint || 0})});
+  ctx = await api('/api/section/' + sec.id + '/context');
+  renderBatches(); toast('Partiya yakunlandi');
+}
+
+function renderBatches(){
+  const b = ctx.openBatches || [];
+  $('batchList').innerHTML = b.length ? `<table><tbody>${b.map(x => `
+    <tr><td>${x.chamber || '—'}</td><td>${x.product}</td><td class="num">${x.qty}</td>
+        <td class="num"><button onclick="finishBatch(${x.id})">Yakunlash</button></td></tr>`).join('')}
+    </tbody></table>` : '<p class="muted" style="font-size:13px">Ochiq partiya yo\'q</p>';
+}
+
 async function startDowntime(){
   dt = await api('/api/downtime/start', {method:'POST', body: JSON.stringify({
-    shift_id: shift.id, station_id: station.id,
-    reason_code: $('selDowntime').value, worker_id: me.id })});
+    section_id: sec.id, reason_code: $('selDowntime').value,
+    worker_id: me.id, shift_no: shiftNo })});
   renderDowntime();
 }
 async function stopDowntime(){

@@ -16,130 +16,146 @@
   </div>
 </div>
 
-<!-- Direktor ko'radigan birinchi qator -->
 <div class="grid g3" id="kpis"></div>
+
+<!-- Umumiy bo'yoqlash tsexi — korxonaning asosiy quvvat chegarasi -->
+<div class="card" style="margin-top:16px">
+  <h2>Bo'yoqlash tsexi · umumiy resurs yuklamasi</h2>
+  <div id="shared"></div>
+  <p class="muted" style="margin-top:12px;font-size:13px">
+    Bo'yoqlash tsexi ikkala yo'nalishni xizmat qiladi. Navbat qaysi yo'nalishdan kelayotgani —
+    quvvatni taqsimlashdagi asosiy savol.</p>
+</div>
 
 <div class="grid g2" style="margin-top:16px">
   <div class="card">
     <h2>Komplektlilik · sotishga tayyor to'plamlar</h2>
     <table><thead><tr><th>To'plam</th><th class="num">To'liq to'plam</th>
-      <th>Bloklovchi pozitsiya</th></tr></thead>
-      <tbody id="tSets"></tbody></table>
+      <th>Bloklovchi pozitsiya</th></tr></thead><tbody id="tSets"></tbody></table>
     <p class="muted" style="margin-top:12px;font-size:13px">
       Ishlab chiqarilgan dona soni emas — omborda yig'ish mumkin bo'lgan to'liq to'plam soni.</p>
   </div>
 
   <div class="card">
     <h2>Bottleneck · eng uzun navbat</h2>
-    <table><thead><tr><th>Uchastka</th><th>Bo'lim</th>
-      <th class="num">Navbat (dona)</th></tr></thead>
-      <tbody id="tBneck"></tbody></table>
+    <table><thead><tr><th>Bo'lim</th><th>Tsex</th>
+      <th class="num">Navbat</th></tr></thead><tbody id="tBneck"></tbody></table>
   </div>
 
   <div class="card">
     <h2>Reja / fakt</h2>
     <table><thead><tr><th>Mahsulot</th><th class="num">Reja</th>
-      <th class="num">Fakt</th><th class="num">%</th></tr></thead>
-      <tbody id="tPlan"></tbody></table>
+      <th class="num">Fakt</th><th class="num">%</th></tr></thead><tbody id="tPlan"></tbody></table>
   </div>
 
   <div class="card">
-    <h2>Bo'limlar orasidagi qoldiq (WIP)</h2>
+    <h2>Tsexlar orasidagi qoldiq (WIP)</h2>
     <div id="wipBars"></div>
   </div>
 
   <div class="card">
-    <h2>Brak · Pareto</h2>
+    <h2>Brak · Pareto <span class="muted" id="perD" style="text-transform:none"></span></h2>
     <table><thead><tr><th>Sabab</th><th>Manba</th><th class="num">Dona</th></tr></thead>
       <tbody id="tDefect"></tbody></table>
   </div>
 
   <div class="card">
-    <h2>To'xtash · Pareto</h2>
-    <table><thead><tr><th>Sabab</th><th>Uchastka</th><th class="num">Daqiqa</th></tr></thead>
+    <h2>To'xtash · Pareto <span class="muted" id="perT" style="text-transform:none"></span></h2>
+    <table><thead><tr><th>Sabab</th><th>Bo'lim</th><th class="num">Daqiqa</th></tr></thead>
       <tbody id="tDown"></tbody></table>
   </div>
 </div>
 
 <div class="card" style="margin-top:16px">
-  <h2>Uchastkalar kesimi</h2>
-  <table><thead><tr><th>Liniya</th><th>Bo'lim</th><th>Uchastka</th>
+  <h2>Bo'limlar kesimi</h2>
+  <table><thead><tr><th>Yo'nalish</th><th>Tsex</th><th>Bo'lim</th>
     <th class="num">OK</th><th class="num">Brak</th><th class="num">Brak %</th></tr></thead>
     <tbody id="tStations"></tbody></table>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-const n = v => (v ?? 0).toLocaleString('uz-UZ');
+const n = v => Number(v ?? 0).toLocaleString('uz-UZ');
 $('date').value = new Date().toISOString().slice(0, 10);
 
-function pctTag(p){
-  const c = p >= 95 ? 'ok' : p >= 80 ? 'warn' : 'bad';
-  return `<span class="tag ${c}">${p ?? 0}%</span>`;
-}
+const pctTag = p => `<span class="tag ${p >= 95 ? 'ok' : p >= 80 ? 'warn' : 'bad'}">${p ?? 0}%</span>`;
+const empty = (c, t) => `<tr><td class="muted" colspan="${c}">${t}</td></tr>`;
 
 async function load(){
   const d = await fetch('/api/dashboard?date=' + $('date').value).then(r => r.json());
 
-  const planTotal = d.planFact.reduce((s, r) => s + Number(r.plan_qty), 0);
-  const factTotal = d.planFact.reduce((s, r) => s + Number(r.fact_qty), 0);
-  const defectTotal = d.stationDaily.reduce((s, r) => s + Number(r.qty_defect), 0);
-  const okTotal = d.stationDaily.reduce((s, r) => s + Number(r.qty_ok), 0);
-  const defectPct = okTotal + defectTotal
+  const sum = (a, f) => a.reduce((s, r) => s + Number(f(r)), 0);
+  const planTotal   = sum(d.planFact, r => r.plan_qty);
+  const factTotal   = sum(d.planFact, r => r.fact_qty);
+  const defectTotal = sum(d.sectionDaily, r => r.qty_defect);
+  const okTotal     = sum(d.sectionDaily, r => r.qty_ok);
+  const defectPct   = okTotal + defectTotal
     ? (100 * defectTotal / (okTotal + defectTotal)).toFixed(1) : '0.0';
-  const dtMin = d.downtime.reduce((s, r) => s + Number(r.minutes), 0);
-  const sets = d.completeness.reduce((s, r) => s + Number(r.complete_sets || 0), 0);
+  const dtMin = sum(d.downtime, r => r.minutes);
+  const sets  = sum(d.completeness, r => r.complete_sets || 0);
 
   $('kpis').innerHTML = [
     ['Reja bajarilishi', planTotal ? Math.round(100 * factTotal / planTotal) + '%' : '—',
       `${n(factTotal)} / ${n(planTotal)} dona`],
-    ['Brak', defectPct + '%', `${n(defectTotal)} dona`],
-    ['To\'xtash', n(dtMin), 'daqiqa'],
+    ['Brak', defectPct + '%', `${n(defectTotal)} dona · shu kuni`],
+    ['To\'xtash', n(dtMin), 'daqiqa · davr bo\'yicha'],
     ['Tayyor to\'plam', n(sets), 'sotishga tayyor'],
-  ].map(([t, v, s]) => `<div class="card"><h2>${t}</h2>
-      <div class="kpi">${v}</div><div class="muted" style="font-size:13px">${s}</div></div>`).join('');
+  ].map(([t, v, s]) => `<div class="card"><h2>${t}</h2><div class="kpi">${v}</div>
+      <div class="muted" style="font-size:13px">${s}</div></div>`).join('');
 
-  // Komplektlilik + eng kam imkon beruvchi pozitsiya
+  // Umumiy tsex yuklamasi — yo'nalishlar ulushi
+  const tot = sum(d.sharedLoad, r => r.queue_qty);
+  $('shared').innerHTML = d.sharedLoad.length ? d.sharedLoad.map(s => `
+    <div style="margin-bottom:14px">
+      <div class="row" style="justify-content:space-between">
+        <span>${s.line_name}</span>
+        <span class="num">${n(s.queue_qty)} dona · ${s.share_pct ?? 0}%</span></div>
+      <div class="bar"><i style="width:${tot ? 100 * s.queue_qty / tot : 0}%"></i></div>
+    </div>`).join('') + `<p class="muted" style="font-size:13px">Jami navbat: ${n(tot)} dona</p>`
+    : '<p class="muted">Navbat yo\'q</p>';
+
   $('tSets').innerHTML = d.completeness.length ? d.completeness.map(s => {
-    const b = d.blockers.filter(x => x.set_product_id === s.set_product_id)[0];
+    const b = d.blockers.find(x => x.set_product_id === s.set_product_id);
     return `<tr><td>${s.set_name}</td><td class="num">${n(s.complete_sets)}</td>
       <td class="muted">${b ? b.blocking_item + ' · ' + n(b.in_stock) + ' dona' : '—'}</td></tr>`;
-  }).join('') : '<tr><td class="muted" colspan="3">To\'plam kiritilmagan</td></tr>';
+  }).join('') : empty(3, 'To\'plam tarkibi kiritilmagan (set_items)');
 
   $('tBneck').innerHTML = d.bottleneck.length ? d.bottleneck.map((b, i) =>
-    `<tr><td>${i === 0 ? '<span class="tag bad">1</span> ' : ''}${b.station}</td>
-      <td class="muted">${b.department}</td><td class="num">${n(b.queue_qty)}</td></tr>`).join('')
-    : '<tr><td class="muted" colspan="3">Navbat yo\'q</td></tr>';
+    `<tr><td>${i === 0 ? '<span class="tag bad">1</span> ' : ''}${b.section}</td>
+      <td class="muted">${b.shop}${b.is_shared ? ' <span class="tag">umumiy</span>' : ''}</td>
+      <td class="num">${n(b.queue_qty)}</td></tr>`).join('') : empty(3, 'Navbat yo\'q');
 
   $('tPlan').innerHTML = d.planFact.length ? d.planFact.map(r =>
     `<tr><td>${r.product}</td><td class="num">${n(r.plan_qty)}</td>
       <td class="num">${n(r.fact_qty)}</td><td class="num">${pctTag(Number(r.pct))}</td></tr>`).join('')
-    : '<tr><td class="muted" colspan="4">Reja kiritilmagan</td></tr>';
+    : empty(4, 'Reja kiritilmagan');
 
-  const maxWip = Math.max(1, ...d.departmentWip.map(w => Number(w.queue_qty) || 0));
-  $('wipBars').innerHTML = d.departmentWip.length ? d.departmentWip.map(w => `
+  const maxWip = Math.max(1, ...d.shopWip.map(w => Number(w.queue_qty) || 0));
+  $('wipBars').innerHTML = d.shopWip.length ? d.shopWip.map(w => `
     <div style="margin-bottom:14px">
       <div class="row" style="justify-content:space-between">
-        <span>${w.line} · ${w.department}</span>
+        <span>${w.shop}${w.is_shared ? ' · ' + w.line_name : ''}</span>
         <span class="num">${n(w.queue_qty)}</span></div>
       <div class="bar"><i style="width:${100 * (Number(w.queue_qty) || 0) / maxWip}%"></i></div>
     </div>`).join('') : '<p class="muted">Ma\'lumot yo\'q</p>';
 
+  const period = ` · ${d.from} — ${d.date}`;
+  $('perD').textContent = period; $('perT').textContent = period;
+
   $('tDefect').innerHTML = d.defects.length ? d.defects.map(r =>
-    `<tr><td>${r.reason}</td><td class="muted">${r.origin_station}</td>
-      <td class="num">${n(r.qty)}</td></tr>`).join('')
-    : '<tr><td class="muted" colspan="3">Brak qayd etilmagan</td></tr>';
+    `<tr><td>${r.reason}</td><td class="muted">${r.origin_section}</td>
+      <td class="num">${n(r.qty)}</td></tr>`).join('') : empty(3, 'Brak qayd etilmagan');
 
   $('tDown').innerHTML = d.downtime.length ? d.downtime.map(r =>
-    `<tr><td>${r.reason}</td><td class="muted">${r.station}</td>
-      <td class="num">${n(r.minutes)}</td></tr>`).join('')
-    : '<tr><td class="muted" colspan="3">To\'xtash qayd etilmagan</td></tr>';
+    `<tr><td>${r.reason}</td><td class="muted">${r.section}</td>
+      <td class="num">${n(r.minutes)}</td></tr>`).join('') : empty(3, 'To\'xtash qayd etilmagan');
 
-  $('tStations').innerHTML = d.stationDaily.length ? d.stationDaily.map(r =>
-    `<tr><td class="muted">${r.line}</td><td class="muted">${r.department}</td><td>${r.station}</td>
-      <td class="num">${n(r.qty_ok)}</td><td class="num">${n(r.qty_defect)}</td>
-      <td class="num">${r.defect_pct ?? 0}%</td></tr>`).join('')
-    : '<tr><td class="muted" colspan="6">Bu sanada ma\'lumot yo\'q</td></tr>';
+  $('tStations').innerHTML = d.sectionDaily.length ? d.sectionDaily.map(r =>
+    `<tr><td class="muted">${r.line}</td>
+      <td class="muted">${r.shop}${r.is_shared ? ' <span class="tag">umumiy</span>' : ''}</td>
+      <td>${r.section}</td><td class="num">${n(r.qty_ok)}</td>
+      <td class="num">${n(r.qty_defect)}</td><td class="num">${r.defect_pct ?? 0}%</td></tr>`).join('')
+    : empty(6, 'Bu sanada ma\'lumot yo\'q');
 }
 
 load();
