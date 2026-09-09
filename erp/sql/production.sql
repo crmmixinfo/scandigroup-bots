@@ -379,16 +379,22 @@ LEFT JOIN flow_log f
 GROUP BY pl.work_date, pl.line_id, pl.product_id, p.name, p.sku, pl.qty;
 
 -- ★ KOMPLEKTLILIK: omborda nechta TO'LIQ to'plam yig'ish mumkin.
---   "500 dona ishlab chiqarildi" ≠ "40 to'plam sotish mumkin".
-CREATE OR REPLACE VIEW v_set_completeness AS
-SELECT sp.id AS set_product_id, sp.name AS set_name,
-       MIN(FLOOR(COALESCE(stk.qty,0)::numeric / si.qty))::int AS complete_sets,
-       SUM(COALESCE(stk.qty,0))                               AS items_in_stock
-FROM products sp
-JOIN set_items si      ON si.set_product_id = sp.id
-LEFT JOIN fg_stock stk ON stk.product_id = si.item_product_id
-WHERE sp.is_set AND sp.active
-GROUP BY sp.id, sp.name;
+-- KOMPLEKTLILIK — units.sql da
+--
+--   v_set_completeness shu yerda EMAS, units.sql da yaratiladi. Sabab
+--   v_unit_register bilan bir xil: migratsiya har deploy'da qayta ishlaydi
+--   va fayllar tartib bilan yuradi. Bitta view ikki faylda tursa, oldingi
+--   fayl uni eski ustunlar bilan qayta yozmoqchi bo'ladi va "cannot drop
+--   columns from view" xatosi chiqadi — ERP_AUTO_MIGRATE=1 da bu serverning
+--   umuman ko'tarilmasligi demakdir.
+--
+--   Bugun xato chiqmayotgani tasodif: ikkala ta'rifda ustun nomi va turi
+--   bir xil bo'lgani uchun CREATE OR REPLACE o'tib ketyapti. Bittasiga
+--   ustun qo'shilishi bilan keyingi deploy yiqilardi.
+--
+--   units.sql dagi versiya to'liqroq: set_items bo'sh bo'lsa to'plam
+--   nomidagi fg_stock qoldig'ini sotishga tayyor deb hisoblaydi.
+
 
 CREATE OR REPLACE VIEW v_set_blockers AS
 SELECT sp.id AS set_product_id, sp.name AS set_name,
