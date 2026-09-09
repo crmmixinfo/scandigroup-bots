@@ -49,4 +49,20 @@ app.get('/health', async (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Scandi ERP → http://localhost:${PORT}`));
+
+// Serverga qo'yishda migratsiyani qo'lda ishga tushirish noqulay — ERP_AUTO_MIGRATE=1
+// bo'lsa server ko'tarilishidan oldin o'zi bajaradi. SQL fayllar idempotent,
+// shuning uchun har qayta ishga tushishda takrorlanishi xavfsiz.
+(async () => {
+  if (process.env.ERP_AUTO_MIGRATE === '1') {
+    try {
+      const { migrate } = require('./migrate');
+      const stat = await migrate({ quiet: true });
+      console.log('Migratsiya bajarildi:', JSON.stringify(stat));
+    } catch (e) {
+      console.error('Migratsiya xatosi:', e.message);
+      process.exit(1);
+    }
+  }
+  app.listen(PORT, () => console.log(`Scandi ERP → http://localhost:${PORT}`));
+})();

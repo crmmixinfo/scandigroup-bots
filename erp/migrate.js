@@ -16,23 +16,31 @@ const FILES = [
   'units.sql',           // konveyer jurnali: birlik, mijoz, harakat
 ];
 
-(async () => {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL kiritilmagan (.env faylini tekshiring)');
-    process.exit(1);
-  }
+// server.js ham shu funksiyani chaqiradi (ERP_AUTO_MIGRATE=1 bo'lsa),
+// shuning uchun quiet rejimi bor.
+async function migrate({ quiet = false } = {}) {
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL kiritilmagan');
   for (const f of FILES) {
     const sql = fs.readFileSync(path.join(__dirname, 'sql', f), 'utf8');
-    process.stdout.write(`  ${f.padEnd(22)}`);
+    if (!quiet) process.stdout.write(`  ${f.padEnd(22)}`);
     await db.query(sql);
-    console.log('OK');
+    if (!quiet) console.log('OK');
   }
   const { rows } = await db.query(
     `SELECT (SELECT COUNT(*) FROM shops)    AS tsexlar,
             (SELECT COUNT(*) FROM sections) AS bolimlar,
             (SELECT COUNT(*) FROM products) AS sku,
             (SELECT COUNT(*) FROM workers)  AS xodimlar,
+            (SELECT COUNT(*) FROM customers) AS mijozlar,
             (SELECT COUNT(*) FROM production_units) AS birliklar`);
-  console.log('\nBaza tayyor:', rows[0]);
-  await db.end();
-})().catch((e) => { console.error('\nXATO:', e.message); process.exit(1); });
+  return rows[0];
+}
+
+module.exports = { migrate };
+
+// To'g'ridan-to'g'ri ishga tushirilganda: npm run erp:migrate
+if (require.main === module) {
+  migrate()
+    .then(async (stat) => { console.log('\nBaza tayyor:', stat); await db.end(); })
+    .catch((e) => { console.error('\nXATO:', e.message); process.exit(1); });
+}
