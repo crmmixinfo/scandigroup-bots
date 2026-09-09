@@ -58,18 +58,26 @@ erp/
   auth.js              sessiya, PIN, Telegram imzosi, huquq guard'i
   notify.js            bot xabarlari navbati
   modules/
-    production.js      ishlab chiqarish API
+    production.js      ishlab chiqarish API (jamlanma hisob)
+    units.js           konveyer jurnali va mijozlar
+    admin.js           xodimlar va rollar
+    shift.js           smenani mahsulot yo'nalishidan aniqlash
   sql/
     core.sql           xodim, rol, huquq, sessiya, audit, bildirishnoma
     core-seed.sql      huquqlar va rollar
     production.sql     ishlab chiqarish jadvallari va hisobot view'lari
     production-seed.sql tsexlar, bo'limlar, marshrutlar
     production-sku.sql  fason va SKU katalogi
+    units.sql          konveyer jurnali: birlik, harakat, mijoz, kanal
   public/
     app.js             klient: sessiya, huquq, so'rov
     index.html         modullar menyusi
+    jurnal.html        ishlab chiqarish jurnali
+    qoldiq.html        boshlang'ich qoldiq
+    mijozlar.html      mijozlar va kanal tahlili
     zavod.html         zavod ko'rinishi
     dashboard.html     ko'rsatkichlar paneli
+    smena.html         tsex boshlig'ining kiritish jadvali
     terminal.html      tsex terminali
 ```
 
@@ -136,12 +144,68 @@ Operator smenani tanlamaydi — tizim uni mahsulot yo'nalishidan aniqlaydi.
 
 | Sahifa | Kim uchun | Huquq |
 |---|---|---|
+| `/jurnal.html` | **Ishlab chiqarish boshlig'i**: har mahsulot konveyer raqami bilan | `production.view` |
+| `/qoldiq.html` | Boshlang'ich qoldiq — bir martalik kiritish | `production.manage` |
+| `/mijozlar.html` | Mijozlar ro'yxati, kanal va menejer tahlili | `production.view` |
 | `/zavod.html` | Nima qayerda, qachon keyingi tsexga o'tadi, qachon omborga kiradi | `production.view` |
 | `/dashboard.html` | Reja/fakt, bottleneck, komplektlilik, umumiy tsex yuklamasi, Pareto | `production.view` |
 | `/smena.html` | **Tsex boshlig'i**: bir tsexning barcha bo'limlari bo'yicha kunlik kiritish | `production.entry` |
 | `/terminal.html` | Tsex planshetlari: bo'lim bo'yicha real vaqtda kiritish | `production.entry` |
 | `/sozlamalar.html` | Bo'lim quvvati — muddat bashorati shunga tayanadi | `production.manage` |
 | `/xodimlar.html` | Xodim, PIN, rol va tsex biriktirish | `admin.users` |
+
+### Ishlab chiqarish jurnali — konveyer raqami
+
+Ikki xil kuzatuv birligi bir bazada yashaydi:
+
+| Model | Birlik | Kim uchun |
+|---|---|---|
+| **Jamlanma** | dona / bo'lim | Tsex boshlig'i: "Freza bo'limidan 30 dona o'tdi" |
+| **Konveyer birligi** | raqamli birlik | Ishlab chiqarish boshlig'i: "K-2026-0001 qayerda, kimga ketadi" |
+
+Konveyer birligi o'tkazilganda tizim **jamlanma yozuvni ham** yozadi, shuning
+uchun zavod ko'rinishi, panel va Pareto hisobotlari ikkala usulda ham to'g'ri
+ishlaydi. Boshlang'ich qoldiq ham shunday — kiritilgan birlik darrov WIP ga
+tushadi.
+
+Jurnal ustunlari gorizontal, mahsulotlar qatorlarda vertikal:
+
+```
+Sana · Konveyer № · Zakaz № · Mahsulot · Turi · Soni · Tsex · Bo'lim ·
+Keyingi tsexga · T/M omborga · Mijoz · Narx · Summa · Chiqish sanasi
+```
+
+- **Konveyer №** — ishlab chiqarish beradi, takrorlanmas. `K-2026-0001`
+  shaklida avtomatik taklif qilinadi.
+- **Zakaz №** — savdo bo'limi zakaz tushganda qo'yadi. Bir mijoz mehmonxona
+  to'plami + stol + stul olsa, uchalasiga bitta zakaz raqami qo'yiladi va
+  jurnalda shu raqam bo'yicha filtrlanadi. Zakaz hali yo'q bo'lsa faqat
+  konveyer raqami turadi.
+- **Mijoz** — biriktirilmagan bo'lsa `T/M ombor` deb ko'rsatiladi.
+- **Keyingi tsexga / T/M omborga** — qo'lda reja kiritilsa `reja`, kiritilmasa
+  marshrut va bo'lim quvvatidan `taxmin`, allaqachon kirgan bo'lsa `fakt`
+  belgisi bilan chiqadi.
+
+Birlik "O'tkazish" tugmasi bilan marshrutdagi **keyingi bo'limga** o'tadi —
+qaysi bo'lim ekanini tizim marshrutdan o'zi topadi. Chiqish bo'limiga
+yetganda birlik avtomatik T/M omboriga tushadi va `fg_stock` yangilanadi.
+
+### Mijozlar
+
+| Maydon | Izoh |
+|---|---|
+| Mijoz nomi | takrorlanmas; qayta import qilinsa yangi qator yaratmaydi |
+| Respublika | O'zbekiston · Qozog'iston · Qirg'iziston · Tojikiston · Ozarbayjon |
+| Region | respublikaga qarab taklif qilinadi, lekin erkin matn |
+| Tel raqami | |
+| Kanali | Instagram · Telegram · Salon · Tavsiya · Sayt · Ko'rgazma · Diler |
+| Savdo menejeri | xodimlar ro'yxatidan biriktiriladi |
+
+Ro'yxatni birdan import qilish mumkin (nuqtali vergul bilan):
+`Mijoz nomi ; Respublika ; Region ; Tel raqami ; Kanal`
+
+Kesimlar: kanal, respublika, region va savdo menejeri bo'yicha mijoz soni,
+dona va summa. Kanal kesimi reklama byudjetini taqsimlashda asosiy ko'rsatkich.
 
 ### Ikki xil kiritish usuli
 
@@ -220,8 +284,12 @@ o'chirish yoki o'zgartirish** (`/xodimlar.html`).
 3. `/sozlamalar.html` — har bo'limning taxminiy kunlik quvvatini kiriting.
    Aniq bo'lmasa ham kiriting: muddat bashorati shusiz ishlamaydi, real fakt
    yig'ilgach bu qiymatlar avtomatik ustunlikni yo'qotadi.
-4. Tsex boshliqlari `/smena.html` da har kuni ma'lumot kiritadi.
-5. Siz `/zavod.html` va `/dashboard.html` dan kuzatasiz.
+4. `/mijozlar.html` — mijozlar ro'yxatini import qiling.
+5. `/qoldiq.html` — bugun konveyerda turgan va T/M omborida yotgan
+   mahsulotlarni konveyer raqami bilan kiriting. Bu bir martalik ish.
+6. Kundalik ish: ishlab chiqarish boshlig'i `/jurnal.html` da birliklarni
+   o'tkazadi, tsex boshliqlari `/smena.html` da jamlanma kiritadi.
+7. Siz `/zavod.html` va `/dashboard.html` dan kuzatasiz.
 
 ## Joriy qilish tartibi
 

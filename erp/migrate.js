@@ -13,6 +13,7 @@ const FILES = [
   'production.sql',      // ishlab chiqarish jadvallari va view'lari
   'production-seed.sql', // tsexlar, bo'limlar, marshrutlar
   'production-sku.sql',  // fason va SKU katalogi
+  'units.sql',           // konveyer jurnali: birlik, mijoz, harakat
 ];
 
 (async () => {
@@ -30,7 +31,8 @@ const FILES = [
     `SELECT (SELECT COUNT(*) FROM shops)    AS tsexlar,
             (SELECT COUNT(*) FROM sections) AS bolimlar,
             (SELECT COUNT(*) FROM products) AS sku,
-            (SELECT COUNT(*) FROM workers)  AS xodimlar`);
+            (SELECT COUNT(*) FROM workers)  AS xodimlar,
+            (SELECT COUNT(*) FROM production_units) AS birliklar`);
   console.log('\nBaza tayyor:', rows[0]);
   await db.end();
 })().catch((e) => { console.error('\nXATO:', e.message); process.exit(1); });

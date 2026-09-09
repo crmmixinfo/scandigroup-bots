@@ -17,6 +17,7 @@ app.use('/api/auth', auth.router);
 // ulanadi. Huquqlar sql/core-seed.sql da allaqachon mavjud.
 app.use('/api', require('./modules/production'));
 app.use('/api/admin', require('./modules/admin'));
+app.use('/api/units', require('./modules/units'));
 // app.use('/api/warehouse',  require('./modules/warehouse'));   // xom ashyo + tayyor mahsulot
 // app.use('/api/purchasing', require('./modules/purchasing'));  // ta'minotchilar
 // app.use('/api/sales',      require('./modules/sales'));       // mijozlar, sotuv

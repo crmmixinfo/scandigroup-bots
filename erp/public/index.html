@@ -26,6 +26,15 @@
 const $ = id => document.getElementById(id);
 
 const PAGES = [
+  { href:'/jurnal.html', title:'Ishlab chiqarish jurnali', lead:'Konveyer raqami bo\'yicha',
+    text:"Har mahsulot: sana, konveyer №, zakaz №, tsex, bo'lim, mijoz, narx, muddatlar",
+    perm:['production.view'] },
+  { href:'/qoldiq.html', title:"Boshlang'ich qoldiq", lead:'Bir martalik kiritish',
+    text:"Tizim ishga tushgan kundagi konveyerdagi va T/M omboridagi mahsulotlar",
+    perm:['production.manage'] },
+  { href:'/mijozlar.html', title:'Mijozlar', lead:'Ro\'yxat va kanal tahlili',
+    text:"Mijoz nomi, region, telefon, kanal · qaysi kanal qancha sotuv keltirdi",
+    perm:['production.view'] },
   { href:'/zavod.html', title:"Zavod ko'rinishi", lead:'Nima qayerda',
     text:"Har mahsulot qaysi tsex va bo'limda · qachon keyingi tsexga o'tadi · qachon omborga kiradi",
     perm:['production.view'] },
