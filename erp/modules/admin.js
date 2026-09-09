@@ -52,9 +52,9 @@ router.post('/workers', need('admin.users'), wrap(async (req, res) => {
         `INSERT INTO worker_roles (worker_id, role_code, scope_shop_id) VALUES ($1,$2,$3)`,
         [w.id, r.code, r.scope_shop_id || null]);
     }
-    await client.query('COMMIT');
     await audit(req, { module: 'admin', action: 'create', entity: 'worker',
-                       entity_id: w.id, payload: { name, roles } });
+                       entity_id: w.id, payload: { name, roles } }, client);
+    await client.query('COMMIT');
     res.json({ id: w.id });
   } catch (e) {
     await client.query('ROLLBACK');
@@ -92,9 +92,9 @@ router.patch('/workers/:id', need('admin.users'), wrap(async (req, res) => {
     // Rol yoki holat o'zgarsa sessiyalar bekor qilinadi — huquq darhol kuchga kiradi
     if (Array.isArray(roles) || active === false)
       await client.query(`DELETE FROM sessions WHERE worker_id = $1`, [id]);
-    await client.query('COMMIT');
     await audit(req, { module: 'admin', action: 'update', entity: 'worker',
-                       entity_id: id, payload: req.body });
+                       entity_id: id, payload: req.body }, client);
+    await client.query('COMMIT');
     res.json({ ok: true });
   } catch (e) {
     await client.query('ROLLBACK');

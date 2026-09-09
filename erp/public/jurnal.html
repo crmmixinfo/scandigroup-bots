@@ -28,6 +28,7 @@
         <option value="production">Ishlab chiqarishda</option>
         <option value="fg">T/M omborida</option>
         <option value="shipped">Jo'natilgan</option>
+        <option value="cancelled">Bekor qilingan</option>
       </select></div>
     <div style="flex:1.5;min-width:180px"><label>Qidiruv</label>
       <input id="fQ" placeholder="mahsulot yoki mijoz" oninput="deb()"></div>
@@ -132,7 +133,9 @@ function render(){
       <td class="num" style="white-space:nowrap">
         ${r.status === 'production'
           ? `<button onclick="move(${r.id})">O'tkazish</button>` : ''}
-        <button onclick="edit(${r.id})">✎</button></td>
+        <button onclick="edit(${r.id})">✎</button>
+        ${r.status !== 'cancelled'
+          ? `<button onclick="cancel_(${r.id})" title="Bekor qilish">×</button>` : ''}</td>
     </tr>`).join('')
     : '<tr><td class="muted" colspan="16">Jurnal bo\'sh. Boshlang\'ich qoldiqni kiriting.</td></tr>';
 
@@ -169,6 +172,17 @@ async function move(id){
     await load();
     alert(`${r.moved.length} ta birlik o'tkazildi` +
       (toFg ? `, shundan ${toFg} tasi T/M omboriga kirdi.` : '.'));
+  }catch(e){ alert(e.message); }
+}
+
+// Xato kiritilgan birlikni bekor qilish. O'chirilmaydi — tarix saqlanadi,
+// lekin jurnal va hisobotlardan chiqib ketadi.
+async function cancel_(id){
+  const r = rows.find(x => x.id === id);
+  if (!confirm(`${r.conveyor_no} bekor qilinsinmi? Jurnaldan chiqadi, tarix saqlanadi.`)) return;
+  try{
+    await App.api('/api/units/' + id, { method:'PATCH', body: JSON.stringify({ status:'cancelled' }) });
+    load();
   }catch(e){ alert(e.message); }
 }
 

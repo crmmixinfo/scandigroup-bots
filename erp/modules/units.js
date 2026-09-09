@@ -13,7 +13,10 @@ const { need } = require('../auth');
 const { resolveShift } = require('./shift');
 
 const router = express.Router();
-const COMMERCE = ['sales.manage', 'production.manage'];
+// Birlik yaratish/tahrirlash huquqi. production.manage — marshrut va quvvat
+// uchun; kunlik kiritish uchun production.units yetarli.
+const UNITS    = ['production.units', 'production.manage'];
+const COMMERCE = ['production.units', 'sales.manage', 'production.manage'];
 
 // ───────────────────────────────────────────────────────────────── MIJOZLAR
 router.get('/customers', need('production.view', 'sales.view'), wrap(async (_req, res) => {
@@ -103,7 +106,9 @@ router.get('/', need('production.view'), wrap(async (req, res) => {
   const { order_no, conveyor_no, customer_id, shop_id, status, from, to, q } = req.query;
   const { rows } = await db.query(
     `SELECT * FROM v_unit_register
-      WHERE ($1::text IS NULL OR order_no ILIKE '%' || $1 || '%')
+      -- Bekor qilinganlar faqat maxsus so'ralganda ko'rinadi
+      WHERE ($5::text IS NOT NULL OR status <> 'cancelled')
+        AND ($1::text IS NULL OR order_no ILIKE '%' || $1 || '%')
         AND ($2::text IS NULL OR conveyor_no ILIKE '%' || $2 || '%')
         AND ($3::int  IS NULL OR customer_id = $3)
         AND ($4::int  IS NULL OR shop_id = $4)
@@ -125,7 +130,7 @@ router.get('/orders', need('production.view'), wrap(async (_req, res) => {
 }));
 
 // Keyingi konveyer raqamini taklif qiladi: K-2026-0001
-router.get('/next-no', need('production.manage'), wrap(async (_req, res) => {
+router.get('/next-no', need(...UNITS), wrap(async (_req, res) => {
   const year = new Date().getFullYear();
   const { rows } = await db.query(
     `SELECT COALESCE(MAX(SUBSTRING(conveyor_no FROM '\\d+$')::int), 0) + 1 AS n
@@ -148,18 +153,28 @@ router.get('/:id/history', need('production.view'), wrap(async (req, res) => {
 // ─────────────────────────────────────────────────── BIRLIK YARATISH / QOLDIQ
 // Bir nechta qatorni birdan qabul qiladi — boshlang'ich qoldiq shu bilan
 // kiritiladi: har qator o'z bo'limida turgan holda yaratiladi.
-router.post('/', need('production.manage'), wrap(async (req, res) => {
+router.post('/', need(...UNITS), wrap(async (req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [req.body];
   if (!items.length) return res.status(400).json({ error: 'Qator yo\'q' });
 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    // Bir nechta xodim bir vaqtda kiritsa raqam to'qnashmasligi uchun:
+    // raqam berish shu tranzaksiya davomida qulflanadi.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('conveyor_no'))`);
+
     const created = [];
     for (const it of items) {
-      if (!it.conveyor_no || !String(it.conveyor_no).trim())
-        throw new Error('Konveyer raqami majburiy');
       if (!it.product_id) throw new Error('Mahsulot tanlanmagan');
+      // Raqam bo'sh qoldirilsa server o'zi beradi
+      if (!it.conveyor_no || !String(it.conveyor_no).trim()) {
+        const year = new Date().getFullYear();
+        const n = (await client.query(
+          `SELECT COALESCE(MAX(SUBSTRING(conveyor_no FROM '\\d+$')::int), 0) + 1 AS n
+             FROM production_units WHERE conveyor_no LIKE $1`, [`K-${year}-%`])).rows[0].n;
+        it.conveyor_no = `K-${year}-${String(n).padStart(4, '0')}`;
+      }
 
       // Bo'lim berilsa, u mahsulot marshrutida borligini tekshiramiz
       if (it.section_id) {
@@ -218,9 +233,9 @@ router.post('/', need('production.manage'), wrap(async (req, res) => {
       }
       created.push(u);
     }
-    await client.query('COMMIT');
     await audit(req, { module: 'production', action: 'create', entity: 'units',
-                       entity_id: created.length, payload: { count: created.length } });
+                       entity_id: created.length, payload: { count: created.length } }, client);
+    await client.query('COMMIT');
     res.json({ created });
   } catch (e) {
     await client.query('ROLLBACK');

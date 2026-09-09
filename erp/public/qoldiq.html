@@ -18,8 +18,9 @@
   <p class="muted">Tizim ishga tushirilgan kunda konveyerda turgan va T/M omborida
   yotgan mahsulotlarni kiriting. Har qator — bitta konveyer raqami.</p>
   <p class="muted" style="margin-top:8px;font-size:13px">
-    Bo'lim tanlansa birlik o'sha joydan davom etadi. Chiqish bo'limi (Qadoqlash)
-    tanlansa birlik darrov T/M omboriga tushadi. Zakaz va mijoz keyin ham
+    <strong>Bo'lim tanlanmagan qator saqlanmaydi</strong> — bo'sh qatorni
+    o'chirish shart emas. Chiqish bo'limi (Qadoqlash) tanlansa birlik darrov
+    T/M omboriga tushadi. Zakaz va mijoz keyin ham
     qo'yilishi mumkin — jurnal sahifasidan.</p>
 </div>
 
@@ -126,7 +127,11 @@ function collect(){
     unit_price:  tr.querySelector('.c-price').value === '' ? null
                  : +tr.querySelector('.c-price').value,
     is_opening:  true,
-  })).filter(r => r.conveyor_no);
+  }))
+  // Faqat bo'lim tanlangan qatorlar hisobga olinadi. Konveyer raqami
+  // oldindan to'ldirilgani uchun bu bo'lmasa "+5 qator" bosgan xodim
+  // bexosdan bo'sh birlik yaratib qo'yardi.
+  .filter(r => r.conveyor_no && r.section_id);
 }
 
 function sum(){
@@ -134,8 +139,11 @@ function sum(){
   const qty = r.reduce((s, x) => s + x.qty, 0);
   const amt = r.reduce((s, x) => s + (x.unit_price || 0) * x.qty, 0);
   $('saveBar').classList.toggle('hide', !r.length);
+  const total = document.querySelectorAll('#tB tr').length;
+  const skipped = total - r.length;
   $('sumText').textContent = `${r.length} birlik · ${qty} dona` +
-    (amt ? ` · ${amt.toLocaleString('uz-UZ')} so'm` : '');
+    (amt ? ` · ${amt.toLocaleString('uz-UZ')} so'm` : '') +
+    (skipped ? ` · ${skipped} qator bo'lim tanlanmagani uchun saqlanmaydi` : '');
 }
 
 function reset_(){ $('tB').innerHTML = ''; sum(); }
@@ -149,7 +157,23 @@ async function save(){
 
   $('btnSave').disabled = true;
   try{
-    const r = await App.api('/api/units', { method:'POST', body: JSON.stringify({ items }) });
+    let r;
+    try{
+      r = await App.api('/api/units', { method:'POST', body: JSON.stringify({ items }) });
+    }catch(e){
+      // Boshqa xodim shu raqamni ulgurib kiritgan bo'lsa — raqamlarni
+      // yangilab bir marta qayta urinamiz. Saqlash yaxlit, yarim yozuv qolmaydi.
+      if (!/allaqachon mavjud/.test(e.message)) throw e;
+      nextNo = await App.api('/api/units/next-no');
+      const start = (nextNo.conveyor_no.match(/(\d+)$/) || [0, 0])[1] | 0;
+      const prefix = nextNo.conveyor_no.replace(/\d+$/, '');
+      const inputs = [...document.querySelectorAll('.c-no')];
+      items.forEach((it, i) => {
+        it.conveyor_no = prefix + String(start + i).padStart(4, '0');
+        if (inputs[i]) inputs[i].value = it.conveyor_no;
+      });
+      r = await App.api('/api/units', { method:'POST', body: JSON.stringify({ items }) });
+    }
     reset_();
     nextNo = await App.api('/api/units/next-no');
     seq = 0;
@@ -158,7 +182,7 @@ async function save(){
   finally{ $('btnSave').disabled = false; }
 }
 
-App.start(boot, 'production.manage');
+App.start(boot, 'production.units', 'production.manage');
 </script>
 </body>
 </html>

@@ -42,6 +42,19 @@ API tomonida bitta qator yetarli:
 router.post('/flow', need('production.entry'), handler)
 ```
 
+Tayyor rollar:
+
+| Rol | Nima qila oladi |
+|---|---|
+| `admin` | hammasi |
+| `direktor` | hamma hisobotni ko'radi |
+| `ishlab_boshl` | ishlab chiqarish to'liq: jurnal, marshrut, quvvat |
+| **`kirituvchi`** | **jurnal va qoldiqni to'ldiradi; sozlamalarga tegmaydi** |
+| `tsex_usta` | o'z tsexida dona qayd etadi |
+| `operator` | faqat bo'lim terminali |
+| `sotuvchi` | zakaz, mijoz, narx |
+| `kassir`, `buxgalter`, `omborchi`, `taminotchi`, `hr` | keyingi modullar uchun tayyor |
+
 Yangi lavozim paydo bo'lsa — yangi rol yaratiladi, **kod tegilmaydi**.
 `worker_roles.scope_shop_id` rolni bitta tsex bilan cheklaydi: Korpus ustasi
 terminalda faqat o'z tsexini ko'radi.
@@ -260,17 +273,32 @@ bosqichma-bosqich kiritilishi mumkin — hammasi birdan emas.
 
 ## Ishga tushirish
 
+### Serverga qo'yish (tavsiya etiladi)
+
+Bir necha xodim bir vaqtda ishlashi kerak bo'lsa dastur internetda turishi
+kerak. Railway yoki Render'da tartib bir xil:
+
+1. Loyihani GitHub'dan ulang, `claude/mebel-production-monitoring-nje80r`
+   tarmog'ini tanlang.
+2. **PostgreSQL** qo'shing — platforma `DATABASE_URL` ni o'zi qo'yadi.
+3. O'zgaruvchilarga `ERP_AUTO_MIGRATE=1` qo'shing. Boshqa hech narsa
+   majburiy emas.
+4. Deploy. Server ko'tarilishidan oldin bazani o'zi yaratadi, logda
+   `Migratsiya bajarildi: {...}` ko'rinadi.
+5. Platforma bergan manzilni oching, `0000` PIN bilan kiring va birinchi ish
+   sifatida `/xodimlar.html` da o'z xodimlaringizni kiriting.
+
+`Procfile` da `web: node erp/server.js` — qo'shimcha sozlash kerak emas.
+HTTPS'ni platforma o'zi beradi.
+
+### Lokal ishga tushirish
+
 ```bash
-cp .env.example .env        # DATABASE_URL ni to'ldiring
+cp .env.example .env        # DATABASE_URL ni to'ldiring, PGSSL=off qo'shing
 npm install
 npm run erp:migrate         # bazani yaratadi; qayta ishga tushirish xavfsiz
 npm run erp                 # -> http://localhost:3000
 ```
-
-Serverga qo'yish (Railway, Render va shunga o'xshash): `Procfile` da
-`web: node erp/server.js`. Deploy qilishdan oldin bir marta
-`npm run erp:migrate` ishga tushiriladi. `DATABASE_URL` dan boshqa hech narsa
-majburiy emas — Mini App kerak bo'lganda `HR_BOT_TOKEN` qo'shiladi.
 
 Demo PIN: `0000` admin · `5555` direktor · `1111`–`4444` tsex ustalari ·
 `6666` operator. **Birinchi ish — o'z xodimlaringizni kiritib, demo PIN'larni
@@ -279,8 +307,10 @@ o'chirish yoki o'zgartirish** (`/xodimlar.html`).
 ## Birinchi kun tartibi
 
 1. `npm run erp:migrate` — baza tayyor bo'ladi (4 tsex, 24 bo'lim, 32 SKU).
-2. `/xodimlar.html` — tsex boshliqlarini kiriting, PIN bering, rol va tsex
-   biriktiring. Demo xodimlarni o'chiring.
+2. `/xodimlar.html` — xodimlarni kiriting, PIN bering, rol biriktiring.
+   Ma'lumot kiritadigan xodimlarga **Ma'lumot kirituvchi** rolini bering:
+   ular jurnal va qoldiqni to'ldiradi, lekin marshrut, bo'lim quvvati va
+   xodimlarga tegmaydi. Demo xodimlarni o'chiring.
 3. `/sozlamalar.html` — har bo'limning taxminiy kunlik quvvatini kiriting.
    Aniq bo'lmasa ham kiriting: muddat bashorati shusiz ishlamaydi, real fakt
    yig'ilgach bu qiymatlar avtomatik ustunlikni yo'qotadi.

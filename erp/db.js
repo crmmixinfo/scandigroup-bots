@@ -3,6 +3,10 @@ const { Pool } = require('pg');
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === 'off' ? false : { rejectUnauthorized: false },
+  max: Number(process.env.PG_POOL_MAX || 20),
+  idleTimeoutMillis: 30000,
+  // Hovuz tugaganda so'rov cheksiz kutmasin — xato bergani ma'qul
+  connectionTimeoutMillis: 10000,
 });
 
 // Har modul shu yordamchilarni ishlatadi — xatolikni bir joyda ushlash uchun.
@@ -16,8 +20,14 @@ const today   = () => new Date().toISOString().slice(0, 10);
 const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 
 // Pul va ombor tegadigan har amal audit jurnaliga tushadi.
-async function audit(req, { module, action, entity, entity_id, payload }) {
-  await db.query(
+//
+// MUHIM: tranzaksiya ichidan chaqirilsa o'sha tranzaksiyaning `client` ini
+// uzating. Aks holda funksiya hovuzdan YANGI ulanish so'raydi va bir nechta
+// xodim bir vaqtda ishlaganda hovuz tugab, tizim qotib qoladi:
+// ulanishni ushlab turgan so'rov audit uchun ulanish kutadi, u esa hech
+// qachon bo'shamaydi.
+async function audit(req, { module, action, entity, entity_id, payload }, client = db) {
+  await client.query(
     `INSERT INTO audit_log (worker_id, module, action, entity, entity_id, payload, ip)
      VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [req.user?.id || null, module, action, entity || null,

@@ -10,7 +10,8 @@ INSERT INTO permissions (code, module, name) VALUES
   -- Ishlab chiqarish (ishlayapti)
   ('production.view',   'production', 'Ishlab chiqarishni ko''rish'),
   ('production.entry',  'production', 'Bo''limdan dona o''tkazish, brak, to''xtash'),
-  ('production.manage', 'production', 'Marshrut, reja, spravochnik boshqaruvi'),
+  ('production.units',  'production', 'Konveyer birligi: yaratish, zakaz/mijoz/narx qo''yish'),
+  ('production.manage', 'production', 'Marshrut, reja, bo''lim quvvati, spravochnik'),
   -- Xom ashyo va tayyor mahsulot ombori (rejada)
   ('warehouse.view',    'warehouse',  'Ombor qoldiqlarini ko''rish'),
   ('warehouse.move',    'warehouse',  'Kirim / chiqim / ko''chirish'),
@@ -41,14 +42,15 @@ INSERT INTO roles (code, name, surface, sort) VALUES
   ('admin',        'Administrator',           'web',     1),
   ('direktor',     'Direktor',                'web',     2),
   ('ishlab_boshl', 'Ishlab chiqarish boshlig''i','web',  3),
-  ('tsex_usta',    'Tsex ustasi',             'miniapp', 4),
-  ('operator',     'Bo''lim operatori',       'miniapp', 5),
-  ('omborchi',     'Omborchi',                'miniapp', 6),
-  ('taminotchi',   'Ta''minotchi',            'web',     7),
-  ('sotuvchi',     'Sotuv menejeri',          'web',     8),
-  ('kassir',       'Kassir',                  'web',     9),
-  ('buxgalter',    'Buxgalter',               'web',    10),
-  ('hr',           'HR / kadrlar',            'web',    11)
+  ('kirituvchi',   'Ma''lumot kirituvchi',    'web',     4),
+  ('tsex_usta',    'Tsex ustasi',             'miniapp', 5),
+  ('operator',     'Bo''lim operatori',       'miniapp', 6),
+  ('omborchi',     'Omborchi',                'miniapp', 7),
+  ('taminotchi',   'Ta''minotchi',            'web',     8),
+  ('sotuvchi',     'Sotuv menejeri',          'web',     9),
+  ('kassir',       'Kassir',                  'web',    10),
+  ('buxgalter',    'Buxgalter',               'web',    11),
+  ('hr',           'HR / kadrlar',            'web',    12)
 ON CONFLICT (code) DO NOTHING;
 
 -- Admin — hamma huquq
@@ -63,8 +65,14 @@ UNION ALL SELECT 'direktor', 'admin.audit'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_code, permission_code) VALUES
-  ('ishlab_boshl', 'production.view'), ('ishlab_boshl', 'production.entry'),
-  ('ishlab_boshl', 'production.manage'), ('ishlab_boshl', 'warehouse.view'),
+  ('ishlab_boshl', 'production.view'),  ('ishlab_boshl', 'production.entry'),
+  ('ishlab_boshl', 'production.units'), ('ishlab_boshl', 'production.manage'),
+  ('ishlab_boshl', 'warehouse.view'),
+
+  -- Ma'lumot kirituvchi: jurnal va qoldiqni to'ldiradi, lekin marshrut,
+  -- bo'lim quvvati va spravochniklarga tegmaydi.
+  ('kirituvchi',   'production.view'), ('kirituvchi', 'production.entry'),
+  ('kirituvchi',   'production.units'),
 
   ('tsex_usta',    'production.view'), ('tsex_usta',    'production.entry'),
   ('operator',     'production.entry'),
@@ -76,7 +84,8 @@ INSERT INTO role_permissions (role_code, permission_code) VALUES
   ('taminotchi',   'warehouse.view'),
 
   ('sotuvchi',     'sales.view'), ('sotuvchi', 'sales.manage'),
-  ('sotuvchi',     'warehouse.view'),
+  ('sotuvchi',     'warehouse.view'), ('sotuvchi', 'production.view'),
+  ('sotuvchi',     'production.units'),
 
   ('kassir',       'cash.view'), ('kassir', 'cash.entry'),
 
